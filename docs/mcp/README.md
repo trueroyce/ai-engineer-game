@@ -1,5 +1,7 @@
 # 唯讀 MCP 賽後教練
 
+> 目前公開 run schema、匯出與 MCP 講評只支援案件 01。案件 02、03 的職涯玩法已公開，但不會渲染講評入口，也不會假裝產生可供這組工具讀取的局紀錄。
+
 本機版的主要流程是一鍵講評：玩家在結算頁按「分析這局」，loopback server會把已驗證的最小公開局紀錄存進固定`runs/`並回讀，再以受限的非互動Claude Code呼叫本專案三個唯讀MCP工具；結構化結果會直接顯示回遊戲頁面。完成一次project-scoped MCP核准後，日常不需另開Claude視窗或手動貼runId。
 
 這個按鈕會使用目前Claude Code登入帳號的額度，並把所選局的公開遊戲紀錄送到Claude服務，因此不是離線分析。它依賴正常訂閱帳號登入，不需另設API key，也不使用`--bare`或跳過權限模式。GitHub Pages沒有本機capability，完全不渲染教練入口，也不會呼叫localhost。

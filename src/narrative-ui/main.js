@@ -1,17 +1,25 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
 import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
+import { loadCareer, saveCareer, settleCase } from '../career/state.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
-let seed = new URL(location.href).searchParams.get('seed') ?? crypto.randomUUID();
-let setup = { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
+const params = new URL(location.href).searchParams;
+const careerMode = params.get('mode') === 'career';
+let careerLoad = careerMode ? loadCareer() : null;
+let career = careerLoad?.status === 'ready' ? careerLoad.career : null;
+let seed = params.get('seed') ?? crypto.randomUUID();
+let setup = career
+  ? { templateId: career.templateId, draw: openingChoices(seed, career.cards), selected: [], career }
+  : { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
 let state = null;
-let screen = 'intro';
+let screen = careerMode && !career ? 'career-error' : career ? 'cards' : 'intro';
 let selectedAction = null;
 let actionOptions = {};
 let lastResult = null;
 let operation = 0;
+let careerSettlement = null;
 let localCoach = null;
 let localAnalysis = null;
 let analysisRequest = 0;
@@ -20,9 +28,21 @@ function view() { return state ? projectNarrativeView(state) : null; }
 
 function render() {
   const v = view();
-  if (screen === 'intro') root.innerHTML = renderIntro(setup);
+  if (screen === 'career-error') root.innerHTML = `<section class="hero screen"><div class="stage-copy"><div class="eyebrow">職涯模式無法開始</div><h1>先回大廳處理存檔</h1><p class="lede">${careerLoad?.reason ?? '目前沒有可用的職涯。'} 原存檔不會在這裡被覆寫。</p><div class="actions"><a class="button" href="./index.html">返回接案大廳</a><a class="button secondary" href="./case-01.html">改玩第一版單案</a></div></div></section>`;
+  else if (screen === 'intro') root.innerHTML = renderIntro(setup);
   else if (screen === 'cards') root.innerHTML = renderCards(setup);
-  else if (v?.ending) root.innerHTML = renderEnding(v, { localCoachAvailable: Boolean(localCoach), localAnalysis });
+  else if (v?.ending) {
+    if (careerMode && career && !careerSettlement) {
+      careerSettlement = settleCase(career, state);
+      career = saveCareer(careerSettlement.career);
+    }
+    root.innerHTML = renderEnding(v, {
+      careerMode,
+      expGained: careerSettlement?.expGained ?? 0,
+      localCoachAvailable: Boolean(localCoach),
+      localAnalysis,
+    });
+  }
   else if (screen === 'upgrade' && v.pendingUpgrade) root.innerHTML = renderUpgrade(v);
   else if (screen === 'preview') root.innerHTML = renderPreview(v, selectedAction, actionOptions, previewAction(state, selectedAction, actionOptions));
   else if (screen === 'result') root.innerHTML = renderResult(v, lastResult);
@@ -41,7 +61,12 @@ function render() {
 function nextOperation() { operation += 1; return `ui-${operation}`; }
 
 function start() {
-  state = createNarrativeGame({ seed, templateId: setup.templateId, selectedCards: setup.selected });
+  state = createNarrativeGame({
+    seed,
+    templateId: setup.templateId,
+    selectedCards: setup.selected,
+    ...(career ? { careerCards: career.cards, careerEquipped: career.equipped } : {}),
+  });
   screen = 'play'; render();
 }
 
@@ -165,10 +190,10 @@ root.addEventListener('click', async (e) => {
       const record = buildRunRecord(state);
       const download = downloadRunRecord(record);
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `已下載備份 ${download.fileName}（${download.bytes} bytes）。`;
+      if (status) status.textContent = `已下載 ${download.fileName}（${download.bytes} bytes）。請把檔案放進專案 runs 資料夾，MCP 教練才看得到。`;
     } catch (error) {
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `下載備份失敗：${error.message}`;
+      if (status) status.textContent = `匯出失敗：${error.message}`;
     }
     return;
   }
@@ -226,7 +251,7 @@ async function discoverLocalCoach() {
     };
     render();
   } catch {
-    // 靜態託管或已停止的本機 server 都不顯示教練入口。
+    // 靜態頁面或已停止的本機 server 不顯示教練入口。
   }
 }
 

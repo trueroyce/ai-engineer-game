@@ -1,14 +1,14 @@
 # AI 工程接案遊戲
 
-一款在純靜態 GitHub Pages 遊玩時不用燒 API 額度、但會讓你感受到接案精神壓力的單案敘事瀏覽器遊戲；本機一鍵 Claude 賽後講評則會使用登入帳號的額度。
+一款在純靜態 GitHub Pages 遊玩時不用燒 API 額度、但會讓你感受到接案精神壓力的三案職涯瀏覽器遊戲；本機案件 01 的一鍵 Claude 賽後講評則會使用登入帳號的額度。
 
-玩家先選擇工程師模板與工具卡，再處理一個看似簡單的待辦工具案件。需求理解、實作、驗證、修復與交付都有多種過程；角色能力、工具卡、公開案件狀態與隨機事件共同影響結果。靜態遊戲不呼叫外部模型，也不會修改玩家電腦上的專案；本機clone後可由玩家明確按下按鈕，選擇使用Claude Code做賽後講評。
+玩家建立一個獨立職涯，選擇工程師角色與最多三張啟用工具卡，再自由挑選三個已實作案件。EXP、卡庫與融合等級跨案保留，Token、時間與壓力則每案重設；角色能力、工具卡、公開案件狀態與隨機事件共同影響結果。靜態遊戲不呼叫外部模型，也不會修改玩家電腦上的專案。
 
 ## 線上遊玩
 
 [開啟 GitHub Pages 版本](https://trueroyce.github.io/ai-engineer-game/)
 
-GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼叫 localhost。唯讀 MCP 賽後教練需將專案 clone 到本機後使用。
+GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼叫 localhost。職涯只存在該網址、瀏覽器與使用者設定檔的 `localStorage`；案件結算並回到大廳後才保存，未結束案件不保存，也沒有雲端同步或職涯匯入／匯出。唯讀 MCP 賽後教練需將專案 clone 到本機後使用。
 
 ## 本機啟動
 
@@ -63,9 +63,9 @@ $claude = "$env:USERPROFILE\.local\bin\claude.exe"
 npm start -- 8081
 ```
 
-開啟`http://127.0.0.1:8081/case-01.html`。根入口與`case-01.html`都進入同一個已驗收單案版本。
+開啟 `http://127.0.0.1:8081/` 進入三案職涯大廳。案件 01、02、03 都可直接選擇；`case-01.html` 仍可直接進入第一案。
 
-首次使用需依[MCP使用說明](docs/mcp/README.md)在這個clone完成一次project-scoped MCP核准。之後完成一局按「分析這局」，同源loopback server會先把已驗證的最小公開局紀錄寫入固定`runs/`並回讀，再以非互動Claude Code呼叫本專案的三個唯讀MCP工具；結構化講評會直接顯示在遊戲頁面，日常不需另開Claude視窗或貼runId。
+首次使用需依[MCP使用說明](docs/mcp/README.md)在這個clone完成一次project-scoped MCP核准。之後完成案件 01 按「分析這局」，同源loopback server會先把已驗證的最小公開局紀錄寫入固定`runs/`並回讀，再以非互動Claude Code呼叫本專案的三個唯讀MCP工具；結構化講評會直接顯示在遊戲頁面，日常不需另開Claude視窗或貼runId。案件 02、03 目前沒有對應 run schema、匯出或 MCP 講評，介面不會假裝支援。
 
 按下分析會使用目前Claude Code帳號的額度，並把該局的公開遊戲紀錄送到Claude服務；這不是離線分析。登入失效、額度不足、MCP權限被拒、逾時或服務忙碌時會明示失敗，不會假裝完成，也不會自動重試消耗額度。相同局會重用已完成結果；只有玩家明確選擇重新分析才會再次呼叫。
 
@@ -76,6 +76,9 @@ npm test
 npm run test:mcp
 npm run test:local-coach
 npm run test:browser
+npm run test:browser:career
+npm run test:browser:case-02
+npm run test:browser:case-03
 npm run test:browser:visual
 npm run test:browser:local-coach
 ```
@@ -96,7 +99,7 @@ Edge 可將 browser 指令中的 `--browser chrome` 改成 `--browser edge`。
 
 ## 公開版本範圍
 
-這是從完整本機開發資料整理出的首次公開 release。公開 repo 只保留單案遊戲、唯讀 MCP、必要測試與整理後文件；原始對話、私人局檔、本機設定、完整測試 artifacts 與開發歷史仍留在使用者電腦。
+這是從完整本機開發資料整理出的乾淨公開 release。公開 repo 只保留三案遊戲與職涯、案件 01 的唯讀 MCP／本機講評、必要測試與整理後文件；原始對話、私人局檔、本機設定、完整測試 artifacts 與完整開發歷史仍只留在使用者電腦。
 
 - [遊戲規格摘要](docs/public/specification.md)
 - [AI 協作摘要](docs/public/ai-collaboration-summary.md)

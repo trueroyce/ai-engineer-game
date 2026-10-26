@@ -18,4 +18,4 @@
 
 ## 公開與私人資料界線
 
-公開 repo 是整理後的首次 release，不是假裝成完整原始歷史。原始 prompt／response、私人路徑、雲端識別、局檔、完整 artifacts 與環境設定仍保留在使用者本機，沒有放上 GitHub。
+公開 repo 是整理後的乾淨 release，不是假裝成完整原始歷史。原始 prompt／response、私人路徑、雲端識別、局檔、完整 artifacts 與環境設定仍保留在使用者本機，沒有放上 GitHub。

@@ -42,7 +42,15 @@ export const CARDS = Object.freeze({
   C4: { id: 'C4', name: '除錯助手', description: 'Lv.1：小修復的有利事件權重 +10。', upgradeDescription: 'Lv.2：有利事件權重 +20；修復本身仍不能刷 XP。', rarity: 'common', drawWeight: 100, maxLevel: 2, effects: [{ type: 'eventWeight', actions: ['A11'], amount: 10 }] },
   C5: { id: 'C5', name: '節奏管理', description: 'Lv.1：休息額外恢復 1 Token，並多降壓力。', upgradeDescription: 'Lv.2：休息額外恢復 2 Token，仍多降壓力。', rarity: 'common', drawWeight: 100, maxLevel: 2, effects: [{ type: 'restRecovery', token: 1, stress: 1 }] },
   C6: { id: 'C6', name: '驗收清單', description: 'Lv.1：第一次完整驗證少花 1 Token。', upgradeDescription: 'Lv.2：每次完整驗證都少花 1 Token。', rarity: 'common', drawWeight: 100, maxLevel: 2, effects: [{ type: 'resourceCost', actions: ['A08'], amount: -1, firstOnly: true }] },
+  C7: { id: 'C7', name: '介面契約', description: 'Lv.1：定義資料或介面契約少花 1 Token，並提高釐清成功機會。', upgradeDescription: 'Lv.2：契約工作仍少花 1 Token，成功機會加成提高。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'contractSupport', amount: 10 }] },
+  C8: { id: 'C8', name: '決策紀錄簿', description: 'Lv.1：處理需求變更時少承受 1 壓力。', upgradeDescription: 'Lv.2：需求變更再少花 1 Token；決策仍必須由玩家確認。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'changeControl', amount: 1 }] },
+  C9: { id: 'C9', name: 'Review 搭檔', description: 'Lv.1：聚焦測試多覆蓋一項，並提高審查成功機會。', upgradeDescription: 'Lv.2：測試再少花 1 Token；仍不能自動通過。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'reviewPartner', amount: 1 }] },
+  C10: { id: 'C10', name: '合併號誌', description: 'Lv.1：可選擇快速合併省 1 時間，但公開增加 1 協調債。', upgradeDescription: 'Lv.2：快速合併再少花 1 Token；協調債仍需修復。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'mergeSignal', amount: 1 }] },
+  C11: { id: 'C11', name: '客戶人話轉接器', description: 'Lv.1：交給 agent 或 NPC 的 brief 品質 +1。', upgradeDescription: 'Lv.2：brief 品質 +2；工具仍不能替客戶作決策。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'briefQuality', amount: 1 }] },
+  C12: { id: 'C12', name: '交接清單', description: 'Lv.1：來源追溯或 handoff 少花 1 Token，並提高交接成功機會。', upgradeDescription: 'Lv.2：成功加成提高；仍需實際完成 review。', rarity: 'expansion', drawWeight: 100, maxLevel: 2, case01: false, effects: [{ type: 'handoffSupport', amount: 10 }] },
 });
+
+export const CASE01_CARD_IDS = Object.freeze(Object.keys(CARDS).filter((id) => CARDS[id].case01 !== false));
 
 export const ACTIONS = Object.freeze({
   A01: { id: 'A01', title: '理解需求', cost: 2, ability: 'A', command: '/plan', risk: '問得太空泛，客戶也可能回一個更空泛的答案。' },
@@ -77,5 +85,5 @@ export function assertAttributes(attrs) {
 }
 
 export function cardLevel(state, id) {
-  return state.cards[id] ?? 0;
+  return state.equipped?.includes(id) ? state.cards[id] ?? 0 : 0;
 }

@@ -41,8 +41,19 @@ export function renderIntro(setup) {
 }
 
 export function renderCards(setup) {
-  const cards = setup.draw.map((id) => `<button class="card tool-card ${setup.selected.includes(id) ? 'selected' : ''}" data-card="${id}" aria-pressed="${setup.selected.includes(id)}">${cardIllustration(id)}<span class="card-copy"><span class="card-kicker">工具卡 · Lv.1</span><strong>${esc(CARDS[id].name)}</strong><span>${esc(CARDS[id].description)}</span></span></button>`).join('');
-  return `<section class="hero screen card-screen"><div class="stage-header compact"><div class="stage-copy"><div class="eyebrow">開場工具 · 三選一</div><h1>先帶一張，別把工具箱扛成房貸</h1><p class="lede">案件約完成三分之一與三分之二時，會再各抽三張選一張；抽到已持有卡可以融合。</p></div><div class="pick-ticket"><span>本輪額度</span><strong>選 1 張</strong><small>三張候選，不買斷人生</small></div></div><div class="grid tool-grid">${cards}</div><div class="selection-footer"><p class="selection-count">已選 <strong>${setup.selected.length}</strong> / 1</p><div class="actions"><button class="button secondary" data-back="intro">返回選角</button><button class="button" data-start ${setup.selected.length === 1 ? '' : 'disabled'}>帶著它開始接案</button></div></div></section>`;
+  const inactiveForCase = setup.career?.equipped?.filter((id) => CARDS[id]?.case01 === false) ?? [];
+  const career = setup.career ? { ...setup.career, equipped: setup.career.equipped.filter((id) => CARDS[id]?.case01 !== false) } : null;
+  const cards = (inactiveForCase.length ? `<p class="notice"><strong>本案適用：</strong>${inactiveForCase.length} 張案件 02、03 工具在案件 01 不生效、不占本案槽位，並完整保留在職涯卡庫。</p>` : '') + setup.draw.map((id) => {
+    const owned = career?.cards?.[id] ?? 0;
+    const active = career?.equipped?.includes(id);
+    const mode = !career ? '工具卡 · Lv.1' : owned >= CARDS[id].maxLevel ? `已滿級 · Lv.${owned}` : owned ? `融合升級 · Lv.${owned} → Lv.${owned + 1}` : career.equipped.length >= 3 ? '新卡 · 收入卡庫' : '新卡 · 取得並啟用';
+    const description = owned && owned < CARDS[id].maxLevel ? CARDS[id].upgradeDescription : CARDS[id].description;
+    const activeNote = career && active ? '<span class="muted">目前已啟用；融合後立即變強。</span>' : '';
+    return `<button class="card tool-card ${setup.selected.includes(id) ? 'selected' : ''}" data-card="${id}" aria-pressed="${setup.selected.includes(id)}">${cardIllustration(id, Math.min(CARDS[id].maxLevel, Math.max(1, owned + (owned < CARDS[id].maxLevel ? 1 : 0))))}<span class="card-copy"><span class="card-kicker">${esc(mode)}</span><strong>${esc(CARDS[id].name)}</strong><span>${esc(description)}</span>${activeNote}</span></button>`;
+  }).join('');
+  const careerNote = career ? `<p class="notice"><strong>職涯攜卡：</strong>你目前啟用 ${career.equipped.length} / 3 張。新卡遇到滿槽會先收藏，不會逼你先丟卡；收藏卡不會暗中生效。</p>` : '';
+  const back = career ? '<a class="button secondary" href="./index.html">返回接案大廳</a>' : '<button class="button secondary" data-back="intro">返回選角</button>';
+  return `<section class="hero screen card-screen"><div class="stage-header compact"><div class="stage-copy"><div class="eyebrow">開場工具 · 三選一</div><h1>${career ? '領一份開工補給，再開始這案' : '先帶一張，別把工具箱扛成房貸'}</h1><p class="lede">案件約完成三分之一與三分之二時，會再各抽三張選一張；抽到已持有卡可以融合。</p></div><div class="pick-ticket"><span>本輪額度</span><strong>選 1 張</strong><small>三張候選，不買斷人生</small></div></div>${careerNote}<div class="grid tool-grid">${cards}</div><div class="selection-footer"><p class="selection-count">已選 <strong>${setup.selected.length}</strong> / 1</p><div class="actions">${back}<button class="button" data-start ${setup.selected.length === 1 ? '' : 'disabled'}>帶著它開始接案</button></div></div></section>`;
 }
 
 export function renderHud(view) {
@@ -167,10 +178,11 @@ export function renderResult(view, result) {
 export function renderUpgrade(view) {
   const reward = view.pendingUpgrade;
   const index = reward.threshold === 2 ? 1 : 2;
-  const owned = Object.fromEntries(view.tools.map((tool) => [tool.id, tool.level]));
+  const owned = Object.fromEntries((view.collection ?? view.tools).map((tool) => [tool.id, tool.level]));
   const cards = reward.choices.map((id) => {
     const level = owned[id] ?? 0;
-    const mode = level ? `融合升級 · Lv.${level} → Lv.${level + 1}` : '取得新卡 · Lv.1';
+    const stored = view.tools.length >= 3 && !view.tools.some((tool) => tool.id === id);
+    const mode = level ? `融合升級 · Lv.${level} → Lv.${level + 1}` : stored ? '取得新卡 · 收入卡庫' : '取得新卡 · Lv.1 並啟用';
     const effect = level ? CARDS[id].upgradeDescription : CARDS[id].description;
     return `<button class="card tool-card upgrade-card" data-upgrade="${id}">${cardIllustration(id, level + 1)}<span class="card-copy"><span class="card-kicker">${esc(mode)}</span><strong>${esc(CARDS[id].name)}</strong><span>${esc(effect)}</span></span></button>`;
   }).join('');
@@ -189,27 +201,44 @@ function renderCoachAnalysis(analysis) {
   return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後講評</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>做得不錯</h3>${list(item.strengths)}</section><section><h3>風險與取捨</h3>${list(item.risks)}</section></div><section><h3>下次可直接做</h3>${list(item.nextActions)}</section><p class="muted"><strong>骰運與限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；沿用同局已完成結果，未再次使用額度。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
 }
 
-export function renderEnding(view, { localCoachAvailable = false, localAnalysis = null } = {}) {
-  const legacy = renderEndingWithLegacyCoach(view);
+export function renderEnding(view, options = {}) {
+  const legacy = renderEndingWithLegacyCoach(view, options);
+  const localCoachAvailable = Boolean(options.localCoachAvailable);
+  const localAnalysis = options.localAnalysis ?? null;
+  const coachStart = legacy.lastIndexOf('<div class="coach-export">');
+  const actionsTag = '<div class="actions">';
+  const actionsStart = coachStart >= 0 ? legacy.indexOf(actionsTag, coachStart) : -1;
+  if (coachStart < 0 || actionsStart < 0) return legacy;
   const coachBlock = localCoachAvailable
     ? '<div class="coach-export"><strong>交給賽後教練</strong><p>直接把這局的公開紀錄存入本機專案 <code>runs</code>；Claude Code 的唯讀 MCP 之後即可讀取。本動作不會自動呼叫模型。</p><p>紀錄不含姓名、帳號、金鑰、seed 或未揭露缺陷。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions">'
     : '<div class="actions">';
-  const withoutLegacyCoach = legacy.replace(/<div class="coach-export">[\s\S]*?<\/div><div class="actions">/, coachBlock);
+  const withoutLegacyCoach = legacy.slice(0, coachStart)
+    + coachBlock
+    + legacy.slice(actionsStart + actionsTag.length);
   const withButtons = withoutLegacyCoach.replace(
     /<button class="button secondary" data-export-run>[^<]*<\/button>/,
     localCoachAvailable ? '<button class="button" data-save-run>存入本機賽後教練</button><button class="button secondary" data-export-run>下載 JSON 備份</button>' : '',
   );
   if (!localCoachAvailable) return withButtons;
+  const renderedCoachStart = withButtons.lastIndexOf('<div class="coach-export">');
+  const renderedActionsStart = renderedCoachStart >= 0 ? withButtons.indexOf(actionsTag, renderedCoachStart) : -1;
+  if (renderedCoachStart < 0 || renderedActionsStart < 0) return withButtons;
   const busy = localAnalysis?.status === 'running' || localAnalysis?.status === 'saving';
   const newCoachBlock = `<div class="coach-export"><strong>本機 Claude 賽後教練</strong><p>按下「分析這局」會直接把這局的公開紀錄存入本機專案 <code>runs</code>，再由受限的 Claude Code 唯讀讀取並把講評顯示在這裡。</p><p><strong>按下即會使用你的 Claude 帳號額度，並把這局公開遊戲資料傳給 Claude 服務。</strong>紀錄不含姓名、帳號、seed、隱藏缺陷或事件權重；Claude 不能改檔、執行命令或讀取其他路徑。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p>${renderCoachAnalysis(localAnalysis)}</div><div class="actions">`;
-  return withButtons
-    .replace(/<div class="coach-export">[\s\S]*?<\/div><div class="actions">/, newCoachBlock)
-    .replace(/<button class="button" data-save-run>[^<]*<\/button>/, `<button class="button" data-analyze-run${busy ? ' disabled' : ''}>分析這局</button><button class="button secondary" data-save-run${busy ? ' disabled' : ''}>只存到本機</button>`);
+  const withAnalysis = withButtons.slice(0, renderedCoachStart)
+    + newCoachBlock
+    + withButtons.slice(renderedActionsStart + actionsTag.length);
+  return withAnalysis.replace(
+    /<button class="button" data-save-run>[^<]*<\/button>/,
+    `<button class="button" data-analyze-run${busy ? ' disabled' : ''}>分析這局</button><button class="button secondary" data-save-run${busy ? ' disabled' : ''}>只存到本機</button>`,
+  );
 }
 
-function renderEndingWithLegacyCoach(view) {
+function renderEndingWithLegacyCoach(view, options = {}) {
   const outcomeLabels = { E01: '正式交付', E02: '正式交付', E03: '正式交付', E04: '有限試用', E05: '展示原型', E06: '正式交付', E07: '進度交接', E08: '主動停止' };
   const facetLabels = { recovered: '修復後交付', 'high-stress': '高壓完成', 'on-time': '期限內完成', 'token-rich': 'Token 守財奴', 'token-gravekeeper': '額度的守墓人' };
   const facets = view.ending.facets?.length ? `<p class="muted">狀態尾聲：${view.ending.facets.map((facet) => esc(facetLabels[facet])).join('、')}</p>` : '';
-  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<p class="muted">主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p><div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button><button class="button" data-new>用新種子再接一案</button></div></div></section>`;
+  const settlement = options.careerMode ? `<div class="coach-export career-settlement"><strong>職涯已結算</strong><p>本次新增 ${options.expGained ?? 0} EXP；已領過的里程碑不會重複發放。卡庫與融合已保存，Token、壓力與時間到此歸零。</p></div>` : '';
+  const next = options.careerMode ? '<a class="button" href="./index.html" data-return-lobby>返回接案大廳</a>' : '<button class="button" data-new>用新種子再接一案</button>';
+  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<p class="muted">主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p>${settlement}<div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button>${next}</div></div></section>`;
 }

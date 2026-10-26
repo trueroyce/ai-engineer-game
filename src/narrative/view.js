@@ -69,6 +69,7 @@ export function projectNarrativeView(state) {
     abilities: structuredClone(state.abilities),
     resources: { token: state.token, stress: state.stress, time: state.timeLeft, overtime: state.overtimeUsed },
     tools: state.equipped.map((id) => ({ ...CARDS[id], level: state.cards[id] })),
+    collection: Object.entries(state.cards).map(([id, level]) => ({ ...CARDS[id], level, equipped: state.equipped.includes(id) })),
     actions,
     primaryActions,
     secondaryActions,
