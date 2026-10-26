@@ -8,7 +8,7 @@
 
 [開啟 GitHub Pages 版本](https://trueroyce.github.io/ai-engineer-game/)
 
-GitHub Pages 只包含靜態遊戲。唯讀 MCP 賽後教練需將專案 clone 到本機後使用。
+GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼叫 localhost。唯讀 MCP 賽後教練需將專案 clone 到本機後使用。
 
 ## 本機啟動
 
@@ -25,21 +25,23 @@ npm start
 ```powershell
 npm test
 npm run test:mcp
+npm run test:local-coach
 npm run test:browser
 npm run test:browser:visual
+npm run test:browser:local-coach
 ```
 
 Edge 可將 browser 指令中的 `--browser chrome` 改成 `--browser edge`。
 
 ## 唯讀 MCP 賽後教練
 
-遊戲結束後可匯出最小必要的公開局紀錄。把 JSON 放進本機 `runs/`，再依 [MCP 使用說明](docs/mcp/README.md) 將三個唯讀工具接入 Claude Code：
+以 `npm start` 啟動本機版後，遊戲結束時可按「存入本機賽後教練」，由只綁定 loopback 的同源 server 把已驗證的最小公開局紀錄直接存入固定 `runs/`。不需下載或手動搬檔。再依 [MCP 使用說明](docs/mcp/README.md) 將三個唯讀工具接入 Claude Code：
 
 - `list_runs`
 - `get_run`
 - `get_rules`
 
-MCP server 不呼叫模型、不需要 API key、不提供 shell、網路或寫入能力；局紀錄文字一律視為不可信資料。
+MCP server 不呼叫模型、不需要 API key、不提供 shell、網路或寫入能力；局紀錄文字一律視為不可信資料。寫入是本機遊戲 server 的受限單一端點，不是 MCP tool。
 
 ## 公開版本範圍
 

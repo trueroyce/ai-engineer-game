@@ -1,6 +1,6 @@
 {
   "name": "ai-engineer-game",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "一款以 AI 工程接案為題材的單案敘事瀏覽器遊戲，附唯讀 MCP 賽後教練。",
   "type": "module",
@@ -11,6 +11,8 @@
     "test:mcp": "node --test tests/mcp/*.test.js tests/narrative/run-export.test.js",
     "test:browser": "node tests/browser/deepening.browser.mjs --browser chrome",
     "test:browser:visual": "node tests/browser/visual-redesign.browser.mjs --browser chrome",
-    "test:browser:mcp": "node tests/browser/mcp-export.browser.mjs --browser chrome"
+    "test:local-coach": "node --test tests/local-coach/*.test.js",
+    "test:browser:mcp": "node tests/browser/mcp-export.browser.mjs --browser chrome",
+    "test:browser:local-coach": "node tests/browser/local-coach.browser.mjs --browser chrome"
   }
 }

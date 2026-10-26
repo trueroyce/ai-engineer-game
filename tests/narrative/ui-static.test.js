@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { createNarrativeGame, performAction } from '../../src/narrative/engine.js';
 import { projectNarrativeView } from '../../src/narrative/view.js';
 import { SIMULATION_NOTICE } from '../../src/narrative/rules.js';
-import { renderIntro, renderPlay, renderPreview } from '../../src/narrative-ui/render.js';
+import { renderEnding, renderIntro, renderPlay, renderPreview } from '../../src/narrative-ui/render.js';
 
 test('首頁說明恰一次，遊戲畫面不重複', () => {
   const setup = { templateId: 'balanced', attrs: { A: 2, E: 2, V: 2 } };
@@ -57,4 +57,27 @@ test('同版本已結算工作明示查看上次結果，案件進度只呈現�
   view = projectNarrativeView(state);
   assert.ok(view.progress.checks.some((check) => check.status.startsWith('待重驗')));
   assert.match(view.progress.delivery.formal, /現行通過證據/);
+});
+
+test('賽後教練只在可信本機 capability 存在時渲染，靜態版沒有入口或手搬提示', () => {
+  let state = createNarrativeGame({ seed: 'ui-local-coach' });
+  state = performAction(state, 'A12', { operationId: 'ui-local-coach-stop', stateVersion: state.stateVersion, intent: 'stop' }).state;
+  const view = projectNarrativeView(state);
+  const staticHtml = renderEnding(view);
+  assert.doesNotMatch(staticHtml, /data-save-run|data-export-run|coach-export|賽後教練|runs|手動|下載/);
+
+  const localHtml = renderEnding(view, { localCoachAvailable: true });
+  assert.match(localHtml, /data-save-run/);
+  assert.match(localHtml, /data-export-run/);
+  assert.match(localHtml, /直接把這局的公開紀錄存入本機專案/);
+  assert.doesNotMatch(localHtml, /手動放|搬到|下載後/);
+
+  const staticRuntime = [
+    '../../src/narrative-ui/main.js',
+    '../../src/narrative-ui/render.js',
+    '../../src/postgame/run-export.js',
+  ].map((file) => fs.readFileSync(new URL(file, import.meta.url), 'utf8')).join('\n');
+  assert.doesNotMatch(staticRuntime, /https?:\/\/(?:127\.0\.0\.1|localhost)|\.mcp\.json|scripts\/mcp-postgame|src\/local-coach/i);
+  const main = fs.readFileSync(new URL('../../src/narrative-ui/main.js', import.meta.url), 'utf8');
+  assert.match(main, /fetch\('\/api\/local-coach\/capability'/);
 });

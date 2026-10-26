@@ -1,6 +1,6 @@
 # 賽後局紀錄（本機）
 
-遊戲結束後按「匯出賽後教練紀錄」，瀏覽器會下載 `<runId>.json`。請把要分析的檔案手動移到這個資料夾，再由 MCP 的 `list_runs`／`get_run` 讀取。
+以 `npm start` 開啟本機遊戲後，遊戲結束時按「存入本機賽後教練」，server 會把合法紀錄直接寫成 `<runId>.json` 放進這個資料夾，再由 MCP 的 `list_runs`／`get_run` 唯讀讀取。純靜態公開版不提供此入口。
 
 - `runs/*.json` 已列入 `.gitignore`，不應提交或 push。
 - MCP server 只讀這一層的 `.json`，不會寫入、搬動或刪除檔案。

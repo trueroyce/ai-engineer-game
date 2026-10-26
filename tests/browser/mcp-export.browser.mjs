@@ -33,7 +33,15 @@ async function waitForDownloads(count, timeout = 10_000) {
   const started = Date.now();
   while (Date.now() - started < timeout) {
     const files = fs.readdirSync(DOWNLOADS).filter((name) => name.endsWith('.json'));
-    if (files.length >= count) return files.sort();
+    const partial = fs.readdirSync(DOWNLOADS).some((name) => name.endsWith('.crdownload'));
+    if (files.length >= count && !partial) {
+      const before = files.map((name) => fs.statSync(path.join(DOWNLOADS, name)).size);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const stable = files.every((name, index) => fs.existsSync(path.join(DOWNLOADS, name))
+        && fs.statSync(path.join(DOWNLOADS, name)).size === before[index]
+        && before[index] > 0);
+      if (stable) return files.sort();
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`等待 ${count} 個 JSON 下載逾時`);
@@ -61,7 +69,7 @@ async function main() {
     await page.waitFor('document.querySelector("[data-export-run]")');
     const before = await page.eval('JSON.stringify(window.__AIEG_NARRATIVE_TEST__.state)');
     const ui = await page.eval(`({ text: document.querySelector('.coach-export')?.textContent, height: document.querySelector('[data-export-run]').getBoundingClientRect().height })`);
-    check('結局顯示最小揭露與手動放入 runs 的說明', /不含姓名、帳號、金鑰、seed/.test(ui.text) && /runs/.test(ui.text), JSON.stringify(ui));
+    check('結局顯示最小揭露與直接存入 runs 的說明', /不含姓名、帳號、金鑰、seed/.test(ui.text) && /直接把這局/.test(ui.text) && /runs/.test(ui.text) && !/手動放/.test(ui.text), JSON.stringify(ui));
     check('匯出按鈕符合 44px 操作高度', ui.height >= 43.5, String(ui.height));
 
     await page.click('[data-export-run]');

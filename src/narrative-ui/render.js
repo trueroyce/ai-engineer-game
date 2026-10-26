@@ -177,7 +177,19 @@ export function renderUpgrade(view) {
   return `${renderHud(view)}<section class="hero screen upgrade-screen"><div class="stage-header compact"><div class="stage-copy"><div class="eyebrow">第 ${index} / 2 次中途工具獎勵 · ${reward.threshold} XP</div><h1>新卡，還是把舊卡焊得更兇？</h1><p class="lede">每輪三張是不同卡；已持有卡可融合成更強的 Lv.2，不增加卡槽。滿級卡不會來佔位。</p></div><div class="fusion-diagram" aria-hidden="true"><span></span><b>+</b><span></span><b>=</b><span class="fused"></span></div></div><div class="grid tool-grid">${cards}</div></section>`;
 }
 
-export function renderEnding(view) {
+export function renderEnding(view, { localCoachAvailable = false } = {}) {
+  const legacy = renderEndingWithLegacyCoach(view);
+  const coachBlock = localCoachAvailable
+    ? '<div class="coach-export"><strong>交給賽後教練</strong><p>直接把這局的公開紀錄存入本機專案 <code>runs</code>；Claude Code 的唯讀 MCP 之後即可讀取。本動作不會自動呼叫模型。</p><p>紀錄不含姓名、帳號、金鑰、seed 或未揭露缺陷。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions">'
+    : '<div class="actions">';
+  const withoutLegacyCoach = legacy.replace(/<div class="coach-export">[\s\S]*?<\/div><div class="actions">/, coachBlock);
+  return withoutLegacyCoach.replace(
+    /<button class="button secondary" data-export-run>[^<]*<\/button>/,
+    localCoachAvailable ? '<button class="button" data-save-run>存入本機賽後教練</button><button class="button secondary" data-export-run>下載 JSON 備份</button>' : '',
+  );
+}
+
+function renderEndingWithLegacyCoach(view) {
   const outcomeLabels = { E01: '正式交付', E02: '正式交付', E03: '正式交付', E04: '有限試用', E05: '展示原型', E06: '正式交付', E07: '進度交接', E08: '主動停止' };
   const facetLabels = { recovered: '修復後交付', 'high-stress': '高壓完成', 'on-time': '期限內完成', 'token-rich': 'Token 守財奴', 'token-gravekeeper': '額度的守墓人' };
   const facets = view.ending.facets?.length ? `<p class="muted">狀態尾聲：${view.ending.facets.map((facet) => esc(facetLabels[facet])).join('、')}</p>` : '';
