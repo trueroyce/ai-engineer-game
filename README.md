@@ -12,9 +12,9 @@ GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼�
 
 ## 本機啟動
 
-一般遊戲需求：Node.js 24或相容版本，以及現代Chrome／Edge。
+本次公開版在Node.js 24.20.0與現代Chrome／Edge完成驗證；其他Node.js版本未獨立驗證。
 
-要使用一鍵賽後講評，目前支援Windows，另需以官方安裝方式將Claude Code 2.1.310以上安裝於預設的`%USERPROFILE%\.local\bin\claude.exe`，並先用正常的Claude Code登入流程完成訂閱帳號登入。不需要另設API key，也不要使用`--bare`或跳過權限的參數。
+一鍵賽後講評的本次驗證環境是Windows與Claude Code 2.1.310。現有橋接只查找預設的`%USERPROFILE%\.local\bin\claude.exe`；安裝在其他位置會明確回報橋接不可用，目前不承諾其他作業系統或安裝路徑。使用前先以正常Claude Code登入流程完成訂閱帳號登入；不需要另設API key，也不要使用`--bare`或跳過權限的參數。
 
 ```powershell
 npm start -- 8081

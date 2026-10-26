@@ -12,7 +12,7 @@
 
 ## 1. 首次啟用本機一鍵講評
 
-需求：Windows、Node.js 24或相容版本，以及以官方安裝方式放在預設`%USERPROFILE%\.local\bin\claude.exe`的Claude Code 2.1.310以上。先用正常流程完成訂閱帳號登入，再於clone後的專案根目錄執行：
+本次驗證環境是Windows、Node.js 24.20.0與Claude Code 2.1.310；其他版本與作業系統未獨立驗證。現有橋接只查找預設的`%USERPROFILE%\.local\bin\claude.exe`，安裝在其他位置會明確回報橋接不可用。先用正常流程完成訂閱帳號登入，再於clone後的專案根目錄執行：
 
 ```powershell
 claude mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
