@@ -189,6 +189,48 @@ export async function saveRunRecord(record, capability, environment = globalThis
   };
 }
 
+function validCapability(capability) {
+  return capability
+    && capability.schema === 'ai-engineer-game.local-coach.v1'
+    && capability.endpoint === '/api/local-coach/runs'
+    && capability.analysisEndpoint === '/api/local-coach/analyze'
+    && capability.cancelEndpoint === '/api/local-coach/cancel'
+    && typeof capability.csrfToken === 'string'
+    && /^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken);
+}
+
+async function localCoachPost(endpoint, body, capability, environment) {
+  if (!validCapability(capability)) throw new Error('本機賽後教練連線資訊無效');
+  const response = await environment.fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-AIEG-CSRF': capability.csrfToken,
+    },
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  let result;
+  try { result = await response.json(); }
+  catch { throw new Error('本機賽後教練回應格式無效'); }
+  if (!response.ok || result?.ok !== true) throw new Error(result?.error?.message ?? `本機賽後教練失敗（HTTP ${response.status}）`);
+  return result;
+}
+
+export async function analyzeRun(runId, capability, { reanalyze = false } = {}, environment = globalThis) {
+  if (typeof runId !== 'string' || !/^case01-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  const result = await localCoachPost(capability.analysisEndpoint, { runId, reanalyze }, capability, environment);
+  if (result.runId !== runId || !result.critique || typeof result.critique !== 'object') throw new Error('Claude 講評回應不完整');
+  return result;
+}
+
+export async function cancelRunAnalysis(runId, capability, environment = globalThis) {
+  if (typeof runId !== 'string' || !/^case01-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  return localCoachPost(capability.cancelEndpoint, { runId }, capability, environment);
+}
+
 export function downloadRunRecord(record, environment = globalThis) {
   const json = serializeRunRecord(record);
   const blob = new environment.Blob([json], { type: 'application/json;charset=utf-8' });

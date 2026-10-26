@@ -2,7 +2,7 @@
 
 一款不用真的燒掉 API 額度、但會讓你感受到接案精神壓力的單案敘事瀏覽器遊戲。
 
-玩家先選擇工程師模板與工具卡，再處理一個看似簡單的待辦工具案件。需求理解、實作、驗證、修復與交付都有多種過程；角色能力、工具卡、公開案件狀態與隨機事件共同影響結果。遊戲不呼叫外部模型，也不會修改玩家電腦上的專案。
+玩家先選擇工程師模板與工具卡，再處理一個看似簡單的待辦工具案件。需求理解、實作、驗證、修復與交付都有多種過程；角色能力、工具卡、公開案件狀態與隨機事件共同影響結果。靜態遊戲不呼叫外部模型，也不會修改玩家電腦上的專案；本機clone後可由玩家明確按下按鈕，選擇使用Claude Code做賽後講評。
 
 ## 線上遊玩
 
@@ -12,13 +12,19 @@ GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼�
 
 ## 本機啟動
 
-需求：Node.js 24 或相容版本，以及現代 Chrome／Edge。
+一般遊戲需求：Node.js 24或相容版本，以及現代Chrome／Edge。
+
+要使用一鍵賽後講評，目前支援Windows，另需以官方安裝方式將Claude Code 2.1.310以上安裝於預設的`%USERPROFILE%\.local\bin\claude.exe`，並先用正常的Claude Code登入流程完成訂閱帳號登入。不需要另設API key，也不要使用`--bare`或跳過權限的參數。
 
 ```powershell
-npm start
+npm start -- 8081
 ```
 
-開啟 `http://127.0.0.1:8080/`。根入口與 `case-01.html` 都進入同一個已驗收單案版本。
+開啟`http://127.0.0.1:8081/case-01.html`。根入口與`case-01.html`都進入同一個已驗收單案版本。
+
+首次使用需依[MCP使用說明](docs/mcp/README.md)在這個clone完成一次project-scoped MCP核准。之後完成一局按「分析這局」，同源loopback server會先把已驗證的最小公開局紀錄寫入固定`runs/`並回讀，再以非互動Claude Code呼叫本專案的三個唯讀MCP工具；結構化講評會直接顯示在遊戲頁面，日常不需另開Claude視窗或貼runId。
+
+按下分析會使用目前Claude Code帳號的額度，並把該局的公開遊戲紀錄送到Claude服務；這不是離線分析。登入失效、額度不足、MCP權限被拒、逾時或服務忙碌時會明示失敗，不會假裝完成，也不會自動重試消耗額度。相同局會重用已完成結果；只有玩家明確選擇重新分析才會再次呼叫。
 
 ## 測試
 
@@ -33,15 +39,17 @@ npm run test:browser:local-coach
 
 Edge 可將 browser 指令中的 `--browser chrome` 改成 `--browser edge`。
 
-## 唯讀 MCP 賽後教練
+## 本機一鍵Claude賽後教練
 
-以 `npm start` 啟動本機版後，遊戲結束時可按「存入本機賽後教練」，由只綁定 loopback 的同源 server 把已驗證的最小公開局紀錄直接存入固定 `runs/`。不需下載或手動搬檔。再依 [MCP 使用說明](docs/mcp/README.md) 將三個唯讀工具接入 Claude Code：
+橋接只綁定`127.0.0.1`，固定以目前專案根目錄為工作目錄，且只接受同源、受CSRF保護、固定schema與大小上限的請求。網頁不能提供prompt、路徑、命令或Claude參數。Claude子程序不載入Bash、Read、Edit、Web或其他MCP，只能使用：
 
 - `list_runs`
 - `get_run`
 - `get_rules`
 
-MCP server 不呼叫模型、不需要 API key、不提供 shell、網路或寫入能力；局紀錄文字一律視為不可信資料。寫入是本機遊戲 server 的受限單一端點，不是 MCP tool。
+這三個MCP工具本身仍完全唯讀；寫入局檔的是受限本機遊戲端點，不是MCP tool。橋接會限制同時只能一個分析、turn數、預算、時間與輸出大小，取消時只終止自己啟動的子程序。局紀錄與模型回覆一律當作不可信資料顯示，不會執行其中的指令。
+
+完整啟用、資料邊界、故障排除與手動唯讀fallback請見[MCP使用說明](docs/mcp/README.md)。GitHub Pages沒有本機capability，因此完全不渲染這個入口，也不會呼叫localhost。
 
 ## 公開版本範圍
 

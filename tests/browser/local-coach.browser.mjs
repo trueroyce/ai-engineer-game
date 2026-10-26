@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createNarrativeGame, performAction } from '../../src/narrative/engine.js';
+import { AnalysisError } from '../../src/local-coach/claude-analysis.js';
 import { createRunStore } from '../../src/mcp/run-store.js';
 import { validateRunRecord } from '../../src/postgame/run-schema.js';
 import { startServer } from '../../scripts/serve.mjs';
@@ -44,9 +45,37 @@ async function main() {
   const runs = fs.mkdtempSync(path.join(os.tmpdir(), 'aieg-browser-runs-'));
   let localServer = null;
   let staticServer = null;
+  let analysisMode = 'success';
+  let analysisCount = 0;
+  let pendingReject = null;
+  const analysisService = {
+    analyze(runId, options) {
+      analysisCount += 1;
+      if (analysisMode === 'hang') return new Promise((_resolve, reject) => { pendingReject = reject; });
+      return Promise.resolve({
+        runId,
+        reused: false,
+        critique: {
+          headline: '<img src=x onerror=alert(1)> 合成講評',
+          summary: '只依公開紀錄整理。',
+          strengths: ['有留下可觀察證據。'],
+          risks: ['單局不能代表穩定能力。'],
+          nextActions: ['先確認需求。', '再跑公開檢查。'],
+          luckAndLimits: '事件結果含骰運。',
+        },
+        usage: { turns: options.reanalyze ? 4 : 3, durationMs: 25, estimatedCostUsd: 0.01 },
+      });
+    },
+    cancel() {
+      if (!pendingReject) return false;
+      pendingReject(new AnalysisError('analysis_cancelled', '已取消這次分析，沒有產生講評。'));
+      pendingReject = null;
+      return true;
+    },
+  };
   const browser = await launch({ executable: EXECUTABLES[BROWSER], width: 1280, height: 900 });
   try {
-    localServer = await startServer({ port: 0, root: ROOT, runsDir: runs, quiet: true });
+    localServer = await startServer({ port: 0, root: ROOT, runsDir: runs, quiet: true, analysisService });
     const localBase = `http://127.0.0.1:${localServer.address().port}/`;
     const { page } = browser;
     await page.goto(`${localBase}case-01.html?seed=browser-local-coach`);
@@ -77,6 +106,25 @@ async function main() {
     check('重複儲存不增加檔案且 bytes 不變', fs.readdirSync(runs).filter((name) => name.endsWith('.json')).length === 1
       && firstBytes.equals(fs.readFileSync(path.join(runs, files[0]))));
     check('成功與重複儲存不改遊戲 state 或 RNG', before === await page.eval('JSON.stringify(window.__AIEG_NARRATIVE_TEST__.state)'));
+
+    await page.click('[data-analyze-run]');
+    await page.waitFor('document.querySelector(".coach-analysis.done")');
+    const analysisUi = await page.eval(`({
+      text: document.querySelector('.coach-analysis.done')?.textContent,
+      injectedImage: Boolean(document.querySelector('.coach-analysis.done img')),
+      state: JSON.stringify(window.__AIEG_NARRATIVE_TEST__.state)
+    })`);
+    check('one-click analysis renders structured critique as text', /合成講評/.test(analysisUi.text) && /事件結果含骰運/.test(analysisUi.text), analysisUi.text);
+    check('model text is escaped and does not mutate game state', !analysisUi.injectedImage && analysisUi.state === before, JSON.stringify(analysisUi));
+    check('one-click analysis invokes exactly one stub model run', analysisCount === 1, String(analysisCount));
+
+    analysisMode = 'hang';
+    await page.click('[data-reanalyze-run]');
+    await page.waitFor('document.querySelector("[data-cancel-analysis]")');
+    await page.click('[data-cancel-analysis]');
+    await page.waitFor('document.querySelector(".coach-analysis.error")');
+    const cancelledText = await page.eval('document.querySelector(".coach-analysis.error").textContent');
+    check('explicit reanalysis can cancel only its pending child and reports no false success', analysisCount === 2 && /取消/.test(cancelledText), cancelledText);
 
     await closeServer(localServer);
     localServer = null;

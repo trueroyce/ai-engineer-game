@@ -335,6 +335,15 @@ details > summary::marker { color: var(--coral); }
 .coach-export { max-width: 60ch; margin-top: 1rem; padding: .85rem 1rem; background: #f6f0e5; border: 2px dashed #70798b; border-radius: .7rem; }
 .coach-export p { margin: .35rem 0 0; }
 .coach-export code { padding: .08rem .3rem; color: var(--text); background: #fff; border: 1px solid #aaa294; border-radius: .25rem; }
+.coach-analysis { margin-top: 1rem; padding: 1rem; color: var(--text); background: #fff; border: 2px solid var(--text); border-radius: .7rem; }
+.coach-analysis.pending { border-style: dashed; }
+.coach-analysis.error { border-color: var(--danger); background: #fff1ef; }
+.coach-analysis.done { box-shadow: 4px 5px 0 #17203322; }
+.coach-analysis h2 { margin: .2rem 0 .65rem; font-size: clamp(1.35rem, 3vw, 2rem); }
+.coach-analysis h3 { margin: .75rem 0 .25rem; font-size: 1rem; }
+.coach-analysis ul { margin: .25rem 0 .75rem; padding-left: 1.35rem; }
+.coach-analysis li + li { margin-top: .3rem; }
+.coach-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 
 /* Shared original SVG ink system. */
 .game-art { display: block; overflow: visible; }
@@ -413,6 +422,7 @@ details > summary::marker { color: var(--coral); }
   .process-beat .process-icon { width: 54px; height: 48px; }
   .ending { padding: 1rem; }
   .ending-tableau .game-art { max-height: 240px; }
+  .coach-columns { grid-template-columns: 1fr; gap: 0; }
   .actions:not(.work-actions) { flex-direction: column; align-items: stretch; }
   .actions:not(.work-actions) .button { width: 100%; }
   .sticky-actions { bottom: .25rem; }

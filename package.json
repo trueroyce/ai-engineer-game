@@ -1,6 +1,6 @@
 {
   "name": "ai-engineer-game",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "一款以 AI 工程接案為題材的單案敘事瀏覽器遊戲，附唯讀 MCP 賽後教練。",
   "type": "module",

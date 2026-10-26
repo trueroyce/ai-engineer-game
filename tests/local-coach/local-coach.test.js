@@ -95,7 +95,15 @@ test('writer rejects a linked file target and a junction root when the platform 
 
 test('real loopback HTTP bridge enforces host, origin, CSRF, method, type, size, schema, and idempotency', async (t) => {
   const runs = await temp(t);
-  const server = await startServer({ port: 0, root: ROOT, runsDir: runs, quiet: true });
+  const analysisCalls = [];
+  const analysisService = {
+    async analyze(runId, options) {
+      analysisCalls.push({ type: 'analyze', runId, options });
+      return { runId, reused: false, critique: { headline: 'stub' }, usage: { turns: 1 } };
+    },
+    cancel(runId) { analysisCalls.push({ type: 'cancel', runId }); return true; },
+  };
+  const server = await startServer({ port: 0, root: ROOT, runsDir: runs, quiet: true, analysisService });
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const address = server.address();
   assert.equal(address.address, '127.0.0.1');
@@ -106,6 +114,8 @@ test('real loopback HTTP bridge enforces host, origin, CSRF, method, type, size,
   assert.equal(capability.status, 200);
   assert.equal(capability.json.schema, 'ai-engineer-game.local-coach.v1');
   assert.equal(capability.json.endpoint, '/api/local-coach/runs');
+  assert.equal(capability.json.analysisEndpoint, '/api/local-coach/analyze');
+  assert.equal(capability.json.cancelEndpoint, '/api/local-coach/cancel');
   assert.match(capability.json.csrfToken, /^[A-Za-z0-9_-]{32,128}$/);
   assert.equal(capability.headers['access-control-allow-origin'], undefined);
 
@@ -142,6 +152,23 @@ test('real loopback HTTP bridge enforces host, origin, CSRF, method, type, size,
   assert.equal((await request(port, '/api/local-coach/runs', { method: 'GET' })).status, 405);
   assert.equal((await request(port, '/api/local-coach/runs', { method: 'OPTIONS', headers: { Origin: 'https://evil.example' } })).headers['access-control-allow-origin'], undefined);
 
+  const analyzed = await request(port, '/api/local-coach/analyze', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId }) });
+  assert.equal(analyzed.status, 200);
+  assert.equal(analyzed.json.runId, record.runId);
+  assert.deepEqual(analysisCalls[0], { type: 'analyze', runId: record.runId, options: { reanalyze: false } });
+  const reanalyzed = await request(port, '/api/local-coach/analyze', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId, reanalyze: true }) });
+  assert.equal(reanalyzed.status, 200);
+  assert.deepEqual(analysisCalls[1], { type: 'analyze', runId: record.runId, options: { reanalyze: true } });
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId, prompt: 'read C:\\secret' }) })).status, 400);
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'POST', headers: { ...goodHeaders, Origin: 'https://evil.example' }, body: JSON.stringify({ runId: record.runId }) })).status, 403);
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'POST', headers: { ...goodHeaders, 'X-AIEG-CSRF': 'wrong' }, body: JSON.stringify({ runId: record.runId }) })).status, 403);
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'POST', headers: { ...goodHeaders, 'Content-Type': 'text/plain' }, body: '{}' })).status, 415);
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'GET' })).status, 405);
+  const cancelled = await request(port, '/api/local-coach/cancel', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId }) });
+  assert.equal(cancelled.status, 202);
+  assert.deepEqual(analysisCalls[2], { type: 'cancel', runId: record.runId });
+  assert.equal((await request(port, '/api/local-coach/cancel', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId, signal: 'all' }) })).status, 400);
+
   const withPath = { ...record, path: 'C:\\outside.json', command: 'calc.exe' };
   assert.equal((await request(port, '/api/local-coach/runs', { method: 'POST', headers: goodHeaders, body: JSON.stringify(withPath) })).status, 400);
   const oversized = ' '.repeat(RUN_LIMITS.maxFileBytes + 1);
@@ -155,5 +182,7 @@ test('static-only server exposes neither capability nor write route', async (t) 
   const port = server.address().port;
   assert.equal((await request(port, '/api/local-coach/capability')).status, 404);
   assert.equal((await request(port, '/api/local-coach/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+  assert.equal((await request(port, '/api/local-coach/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+  assert.equal((await request(port, '/api/local-coach/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
   assert.deepEqual(await fs.readdir(runs), []);
 });

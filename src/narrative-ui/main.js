@@ -1,6 +1,6 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
-import { buildRunRecord, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
+import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
@@ -13,6 +13,8 @@ let actionOptions = {};
 let lastResult = null;
 let operation = 0;
 let localCoach = null;
+let localAnalysis = null;
+let analysisRequest = 0;
 
 function view() { return state ? projectNarrativeView(state) : null; }
 
@@ -20,7 +22,7 @@ function render() {
   const v = view();
   if (screen === 'intro') root.innerHTML = renderIntro(setup);
   else if (screen === 'cards') root.innerHTML = renderCards(setup);
-  else if (v?.ending) root.innerHTML = renderEnding(v, { localCoachAvailable: Boolean(localCoach) });
+  else if (v?.ending) root.innerHTML = renderEnding(v, { localCoachAvailable: Boolean(localCoach), localAnalysis });
   else if (screen === 'upgrade' && v.pendingUpgrade) root.innerHTML = renderUpgrade(v);
   else if (screen === 'preview') root.innerHTML = renderPreview(v, selectedAction, actionOptions, previewAction(state, selectedAction, actionOptions));
   else if (screen === 'result') root.innerHTML = renderResult(v, lastResult);
@@ -41,6 +43,26 @@ function nextOperation() { operation += 1; return `ui-${operation}`; }
 function start() {
   state = createNarrativeGame({ seed, templateId: setup.templateId, selectedCards: setup.selected });
   screen = 'play'; render();
+}
+
+async function analyzeCurrentRun(reanalyze = false) {
+  const request = ++analysisRequest;
+  localAnalysis = { status: 'saving' };
+  render();
+  try {
+    const record = buildRunRecord(state);
+    const saved = await saveRunRecord(record, localCoach);
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'running', runId: saved.runId };
+    render();
+    const result = await analyzeRun(saved.runId, localCoach, { reanalyze });
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'done', runId: saved.runId, result };
+  } catch (error) {
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'error', message: error.message };
+  }
+  render();
 }
 
 root.addEventListener('click', async (e) => {
@@ -99,6 +121,27 @@ root.addEventListener('click', async (e) => {
   if (e.target.closest('[data-continue]')) { screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
   const upgrade = e.target.closest('[data-upgrade]');
   if (upgrade) { state = chooseUpgrade(state, upgrade.dataset.upgrade); screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
+  if (e.target.closest('[data-analyze-run]')) {
+    await analyzeCurrentRun(false);
+    return;
+  }
+  if (e.target.closest('[data-reanalyze-run]')) {
+    await analyzeCurrentRun(true);
+    return;
+  }
+  if (e.target.closest('[data-cancel-analysis]')) {
+    const runId = localAnalysis?.runId;
+    if (!runId) return;
+    analysisRequest += 1;
+    try {
+      await cancelRunAnalysis(runId, localCoach);
+      localAnalysis = { status: 'error', message: '已取消這次分析，沒有產生講評。' };
+    } catch (error) {
+      localAnalysis = { status: 'error', message: error.message };
+    }
+    render();
+    return;
+  }
   const saveRun = e.target.closest('[data-save-run]');
   if (saveRun) {
     const status = root.querySelector('[data-save-status]');
@@ -130,8 +173,9 @@ root.addEventListener('click', async (e) => {
     return;
   }
   if (e.target.closest('[data-new]')) {
+    analysisRequest += 1;
     seed = crypto.randomUUID(); setup = { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
-    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; render();
+    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; localAnalysis = null; render();
   }
 });
 
@@ -169,11 +213,15 @@ async function discoverLocalCoach() {
     const capability = await response.json();
     if (capability?.schema !== 'ai-engineer-game.local-coach.v1'
       || capability.endpoint !== '/api/local-coach/runs'
+      || capability.analysisEndpoint !== '/api/local-coach/analyze'
+      || capability.cancelEndpoint !== '/api/local-coach/cancel'
       || typeof capability.csrfToken !== 'string'
       || !/^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken)) return;
     localCoach = {
       schema: capability.schema,
       endpoint: capability.endpoint,
+      analysisEndpoint: capability.analysisEndpoint,
+      cancelEndpoint: capability.cancelEndpoint,
       csrfToken: capability.csrfToken,
     };
     render();

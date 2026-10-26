@@ -177,16 +177,34 @@ export function renderUpgrade(view) {
   return `${renderHud(view)}<section class="hero screen upgrade-screen"><div class="stage-header compact"><div class="stage-copy"><div class="eyebrow">第 ${index} / 2 次中途工具獎勵 · ${reward.threshold} XP</div><h1>新卡，還是把舊卡焊得更兇？</h1><p class="lede">每輪三張是不同卡；已持有卡可融合成更強的 Lv.2，不增加卡槽。滿級卡不會來佔位。</p></div><div class="fusion-diagram" aria-hidden="true"><span></span><b>+</b><span></span><b>=</b><span class="fused"></span></div></div><div class="grid tool-grid">${cards}</div></section>`;
 }
 
-export function renderEnding(view, { localCoachAvailable = false } = {}) {
+function renderCoachAnalysis(analysis) {
+  if (!analysis) return '';
+  if (analysis.status === 'saving') return '<div class="coach-analysis pending" data-analysis-result><strong>正在安全保存這局…</strong><p>保存成功後才會啟動 Claude。</p></div>';
+  if (analysis.status === 'running') return '<div class="coach-analysis pending" data-analysis-result><strong>Claude 正在讀取這局與公開規則…</strong><p>一次只執行一局；不會自動重送。</p><button class="button secondary" data-cancel-analysis>取消這次分析</button></div>';
+  if (analysis.status === 'error') return `<div class="coach-analysis error" data-analysis-result><strong>這次沒有產生講評</strong><p>${esc(analysis.message)}</p></div>`;
+  if (analysis.status !== 'done' || !analysis.result?.critique) return '';
+  const item = analysis.result.critique;
+  const list = (values) => values.length ? `<ul>${values.map((value) => `<li>${esc(value)}</li>`).join('')}</ul>` : '<p>這局沒有足夠公開資料可下判斷。</p>';
+  const usage = analysis.result.usage?.turns ? `本次 ${analysis.result.usage.turns} 個 agent turn` : '本次分析已完成';
+  return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後講評</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>做得不錯</h3>${list(item.strengths)}</section><section><h3>風險與取捨</h3>${list(item.risks)}</section></div><section><h3>下次可直接做</h3>${list(item.nextActions)}</section><p class="muted"><strong>骰運與限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；沿用同局已完成結果，未再次使用額度。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
+}
+
+export function renderEnding(view, { localCoachAvailable = false, localAnalysis = null } = {}) {
   const legacy = renderEndingWithLegacyCoach(view);
   const coachBlock = localCoachAvailable
     ? '<div class="coach-export"><strong>交給賽後教練</strong><p>直接把這局的公開紀錄存入本機專案 <code>runs</code>；Claude Code 的唯讀 MCP 之後即可讀取。本動作不會自動呼叫模型。</p><p>紀錄不含姓名、帳號、金鑰、seed 或未揭露缺陷。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions">'
     : '<div class="actions">';
   const withoutLegacyCoach = legacy.replace(/<div class="coach-export">[\s\S]*?<\/div><div class="actions">/, coachBlock);
-  return withoutLegacyCoach.replace(
+  const withButtons = withoutLegacyCoach.replace(
     /<button class="button secondary" data-export-run>[^<]*<\/button>/,
     localCoachAvailable ? '<button class="button" data-save-run>存入本機賽後教練</button><button class="button secondary" data-export-run>下載 JSON 備份</button>' : '',
   );
+  if (!localCoachAvailable) return withButtons;
+  const busy = localAnalysis?.status === 'running' || localAnalysis?.status === 'saving';
+  const newCoachBlock = `<div class="coach-export"><strong>本機 Claude 賽後教練</strong><p>按下「分析這局」會直接把這局的公開紀錄存入本機專案 <code>runs</code>，再由受限的 Claude Code 唯讀讀取並把講評顯示在這裡。</p><p><strong>按下即會使用你的 Claude 帳號額度，並把這局公開遊戲資料傳給 Claude 服務。</strong>紀錄不含姓名、帳號、seed、隱藏缺陷或事件權重；Claude 不能改檔、執行命令或讀取其他路徑。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p>${renderCoachAnalysis(localAnalysis)}</div><div class="actions">`;
+  return withButtons
+    .replace(/<div class="coach-export">[\s\S]*?<\/div><div class="actions">/, newCoachBlock)
+    .replace(/<button class="button" data-save-run>[^<]*<\/button>/, `<button class="button" data-analyze-run${busy ? ' disabled' : ''}>分析這局</button><button class="button secondary" data-save-run${busy ? ' disabled' : ''}>只存到本機</button>`);
 }
 
 function renderEndingWithLegacyCoach(view) {

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
+import { AnalysisError, createClaudeAnalysisService } from '../src/local-coach/claude-analysis.js';
 import { createRunWriter, RunWriteError } from '../src/local-coach/run-writer.js';
 import { RUN_LIMITS } from '../src/postgame/run-schema.js';
 
@@ -13,6 +14,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = '127.0.0.1';
 const CAPABILITY_PATH = '/api/local-coach/capability';
 const SAVE_PATH = '/api/local-coach/runs';
+const ANALYZE_PATH = '/api/local-coach/analyze';
+const CANCEL_PATH = '/api/local-coach/cancel';
 const CAPABILITY_SCHEMA = 'ai-engineer-game.local-coach.v1';
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
@@ -87,6 +90,40 @@ function statusFor(error) {
   return 500;
 }
 
+function analysisStatusFor(error) {
+  if (error.code === 'body_too_large') return 413;
+  if (['invalid_json', 'invalid_utf8'].includes(error.code)) return 400;
+  if (['invalid_run_id', 'invalid_request'].includes(error.code)) return 400;
+  if (error.code === 'run_not_found') return 404;
+  if (error.code === 'analysis_busy') return 409;
+  if (['bridge_unavailable', 'mcp_unavailable', 'login_required', 'quota_unavailable'].includes(error.code)) return 503;
+  if (error.code === 'analysis_timeout') return 504;
+  return 500;
+}
+
+function exactObject(value, allowed) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AnalysisError('invalid_request', '請求必須是 object');
+  if (Object.keys(value).some((key) => !allowed.includes(key))) throw new AnalysisError('invalid_request', '請求包含未知欄位');
+  return value;
+}
+
+function protectedJsonPost(req, res, server, csrfToken) {
+  if (req.method !== 'POST') {
+    send(res, 405, 'Method Not Allowed', undefined, { Allow: 'POST' });
+    return false;
+  }
+  if (!localRequestContext(req, server, { requireOrigin: true }) || req.headers['x-aieg-csrf'] !== csrfToken) {
+    send(res, 403, 'Forbidden');
+    return false;
+  }
+  if (String(req.headers['content-type'] ?? '').split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
+    req.resume();
+    send(res, 415, 'Content-Type must be application/json');
+    return false;
+  }
+  return true;
+}
+
 // 回傳 ROOT 內的絕對路徑；任何 `..` 片段、反斜線或跳出 ROOT 的路徑回傳 null。
 export function resolveRequestPath(rawUrl, root = ROOT) {
   const rawPath = String(rawUrl).split('?')[0].split('#')[0];
@@ -115,9 +152,10 @@ function isPrivateStaticPath(abs, root) {
     || rel === 'docs/testing/artifacts' || rel.startsWith('docs/testing/artifacts/');
 }
 
-export function startServer({ port = 8080, root = ROOT, runsDir = path.join(root, 'runs'), quiet = false, enableLocalCoach = true } = {}) {
+export function startServer({ port = 8080, root = ROOT, runsDir = path.join(root, 'runs'), quiet = false, enableLocalCoach = true, analysisService = null } = {}) {
   const csrfToken = crypto.randomBytes(32).toString('base64url');
   const writer = enableLocalCoach ? createRunWriter(runsDir) : null;
+  const analyzer = writer ? (analysisService ?? createClaudeAnalysisService({ projectRoot: root, runsDir })) : null;
   let server;
   server = http.createServer(async (req, res) => {
     if (req.url === CAPABILITY_PATH) {
@@ -127,19 +165,15 @@ export function startServer({ port = 8080, root = ROOT, runsDir = path.join(root
       return sendJson(res, 200, {
         schema: CAPABILITY_SCHEMA,
         endpoint: SAVE_PATH,
+        analysisEndpoint: ANALYZE_PATH,
+        cancelEndpoint: CANCEL_PATH,
         csrfToken,
         maxBodyBytes: RUN_LIMITS.maxFileBytes,
       });
     }
     if (req.url === SAVE_PATH) {
       if (!writer) return send(res, 404, 'Not Found');
-      if (req.method !== 'POST') return send(res, 405, 'Method Not Allowed', undefined, { Allow: 'POST' });
-      if (!localRequestContext(req, server, { requireOrigin: true })) return send(res, 403, 'Forbidden');
-      if (req.headers['x-aieg-csrf'] !== csrfToken) return send(res, 403, 'Forbidden');
-      if (String(req.headers['content-type'] ?? '').split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
-        req.resume();
-        return send(res, 415, 'Content-Type must be application/json');
-      }
+      if (!protectedJsonPost(req, res, server, csrfToken)) return;
       try {
         const record = await readJsonBody(req);
         const saved = await writer.save(record);
@@ -159,6 +193,38 @@ export function startServer({ port = 8080, root = ROOT, runsDir = path.join(root
             message: known ? error.message : '局紀錄無法安全寫入',
           },
         });
+      }
+    }
+    if (req.url === ANALYZE_PATH) {
+      if (!analyzer) return send(res, 404, 'Not Found');
+      if (!protectedJsonPost(req, res, server, csrfToken)) return;
+      try {
+        const body = exactObject(await readJsonBody(req), ['runId', 'reanalyze']);
+        if (typeof body.runId !== 'string') throw new AnalysisError('invalid_run_id', 'runId 格式無效');
+        if (body.reanalyze !== undefined && typeof body.reanalyze !== 'boolean') throw new AnalysisError('invalid_request', 'reanalyze 必須是 boolean');
+        const result = await analyzer.analyze(body.runId, { reanalyze: body.reanalyze ?? false });
+        return sendJson(res, 200, { ok: true, ...result });
+      } catch (error) {
+        const known = error instanceof AnalysisError || error instanceof RunWriteError;
+        const safe = known ? error : new AnalysisError('analysis_failed', 'Claude 分析失敗，這次沒有產生講評。');
+        return sendJson(res, analysisStatusFor(safe), { ok: false, error: { code: safe.code, message: safe.message } });
+      }
+    }
+    if (req.url === CANCEL_PATH) {
+      if (!analyzer) return send(res, 404, 'Not Found');
+      if (!protectedJsonPost(req, res, server, csrfToken)) return;
+      try {
+        const body = exactObject(await readJsonBody(req), ['runId']);
+        if (typeof body.runId !== 'string') throw new AnalysisError('invalid_run_id', 'runId 格式無效');
+        const cancelled = analyzer.cancel(body.runId);
+        return sendJson(res, cancelled ? 202 : 409, {
+          ok: cancelled,
+          cancelled,
+          ...(cancelled ? {} : { error: { code: 'not_running', message: '這局目前沒有正在執行的分析。' } }),
+        });
+      } catch (error) {
+        const safe = error instanceof AnalysisError ? error : new AnalysisError('analysis_failed', '取消分析失敗。');
+        return sendJson(res, analysisStatusFor(safe), { ok: false, error: { code: safe.code, message: safe.message } });
       }
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method Not Allowed');
