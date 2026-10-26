@@ -1,4 +1,4 @@
-import { ACTIONS, CARDS, LIMITS, RULE_VERSION, TEMPLATES, assertAttributes, cardLevel } from './rules.js';
+import { ACTIONS, CARDS, CASE01_CARD_IDS, LIMITS, RULE_VERSION, TEMPLATES, assertAttributes, cardLevel } from './rules.js';
 import { ENDINGS, EVENTS } from './content.js';
 import { unitFor, weightedPick } from './rng.js';
 import { buildProcess } from './process-story.js';
@@ -25,19 +25,39 @@ function draw(seed, key, ids, count) {
   }).slice(0, count);
 }
 
-export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 'balanced', attrs, selectedCards } = {}) {
+export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 'balanced', attrs, selectedCards, careerCards, careerEquipped } = {}) {
   const template = TEMPLATES[templateId];
   if (!template) throw new Error('未知模板');
   const abilities = attrs ?? template.attrs;
   assertAttributes(abilities);
-  const openingDraw = draw(seed, 'opening-cards', Object.keys(CARDS), 3);
-  const equipped = selectedCards ?? openingDraw.slice(0, 1);
-  if (equipped.length !== 1 || equipped.some((id) => !openingDraw.includes(id))) throw new Error('必須從開局三張卡選一張');
-  const cards = Object.fromEntries(equipped.map((id) => [id, 1]));
+  const careerMode = careerCards !== undefined || careerEquipped !== undefined;
+  const openingDraw = openingChoices(seed, careerMode ? careerCards : undefined);
+  const picked = selectedCards ?? openingDraw.slice(0, 1);
+  if (picked.length !== 1 || picked.some((id) => !openingDraw.includes(id))) throw new Error('必須從開局三張卡選一張');
+  let cards;
+  let equipped;
+  if (careerMode) {
+    if (!careerCards || typeof careerCards !== 'object' || Array.isArray(careerCards)) throw new Error('職涯卡庫格式不合法');
+    cards = {};
+    for (const [id, level] of Object.entries(careerCards)) {
+      if (!CARDS[id] || !Number.isInteger(level) || level < 1 || level > CARDS[id].maxLevel) throw new Error('職涯卡庫格式不合法');
+      cards[id] = level;
+    }
+    equipped = [...new Set(careerEquipped ?? [])].filter((id) => CASE01_CARD_IDS.includes(id));
+    if (equipped.length > 3 || equipped.some((id) => !cards[id])) throw new Error('職涯啟用卡格式不合法');
+    const rewardId = picked[0];
+    cards[rewardId] = Math.min(CARDS[rewardId].maxLevel, (cards[rewardId] ?? 0) + 1);
+    if (!equipped.includes(rewardId) && equipped.length < 3) equipped.push(rewardId);
+  } else {
+    equipped = [...picked];
+    cards = Object.fromEntries(equipped.map((id) => [id, 1]));
+  }
   return {
     ruleVersion: RULE_VERSION,
     caseId: 'case-01', seed, phase: 'playing', stateVersion: 0,
     templateId, abilities: clone(abilities), openingDraw, equipped: [...equipped], cards,
+    careerEquippedSnapshot: careerMode ? [...new Set(careerEquipped ?? [])] : null,
+    careerCardsSnapshot: careerMode ? clone(careerCards) : null,
     token: LIMITS.token, stress: 0, timeLeft: LIMITS.deadline, workCount: 0, overtimeUsed: 0,
     requirement: { clarity: 'unknown', pendingQuestions: ['完成後怎麼處理？', '刪除哪一條？', '明天還要用如何驗收？'], scope: 'bounded' },
     documents: { draft: false, confirmed: false, wrongCompletionRule: false, summaryRevision: 0 },
@@ -52,8 +72,14 @@ export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 
   };
 }
 
-export function openingChoices(seed = 'preview') {
-  return draw(seed, 'opening-cards', Object.keys(CARDS), 3);
+export function openingChoices(seed = 'preview', cardLevels) {
+  const ids = [...CASE01_CARD_IDS];
+  if (!cardLevels) return draw(seed, 'opening-cards', ids, 3);
+  const useful = ids.filter((id) => (cardLevels[id] ?? 0) < CARDS[id].maxLevel);
+  const usefulDraw = draw(seed, 'opening-cards', useful, Math.min(3, useful.length));
+  if (usefulDraw.length === 3) return usefulDraw;
+  const filler = draw(seed, 'opening-cards:filler', ids.filter((id) => !usefulDraw.includes(id)), 3 - usefulDraw.length);
+  return [...usefulDraw, ...filler];
 }
 
 function milestone(state, id, value = 1) {
@@ -615,7 +641,7 @@ export function rest(original, { operationId, stateVersion } = {}) {
 
 export function upgradeChoices(state, threshold = state.pendingUpgrades[0]) {
   if (!state.pendingUpgrades.includes(threshold)) return [];
-  const pool = Object.keys(CARDS).filter((id) => cardLevel(state, id) < (CARDS[id].maxLevel ?? 1));
+  const pool = CASE01_CARD_IDS.filter((id) => (state.cards[id] ?? 0) < (CARDS[id].maxLevel ?? 1));
   return draw(state.seed, `upgrade:${threshold}`, pool, Math.min(3, pool.length));
 }
 
@@ -624,9 +650,9 @@ export function chooseUpgrade(original, cardId) {
   const threshold = state.pendingUpgrades[0];
   const choices = upgradeChoices(state, threshold);
   if (!choices.includes(cardId)) throw new Error('升級選擇不在本輪選項');
-  const previousLevel = cardLevel(state, cardId);
+  const previousLevel = state.cards[cardId] ?? 0;
   state.cards[cardId] = Math.min(CARDS[cardId].maxLevel ?? 1, previousLevel + 1);
-  if (!state.equipped.includes(cardId)) state.equipped.push(cardId);
+  if (!state.equipped.includes(cardId) && state.equipped.length < 3) state.equipped.push(cardId);
   state.pendingUpgrades.shift(); state.claimedThresholds.push(threshold); state.stateVersion += 1;
   state.log.push({ actionId: 'UPGRADE', cardId, threshold, kind: previousLevel ? 'fusion' : 'new', previousLevel, nextLevel: state.cards[cardId], options: {}, resourcesAfter: resourceSnapshot(state) });
   return state;

@@ -42,6 +42,12 @@ const cardGlyphs = Object.freeze({
   C4: '<path class="ink paper-fill" d="M71 49h78v111H71z"/><path class="thin" d="M85 69h50M85 88h38M85 107h50"/><path class="ink accent-fill" d="M184 60l22 22-71 72-29 7 7-29z"/><path class="ink" d="M174 70l22 22"/>',
   C5: '<path class="ink accent-fill" d="M67 89h116v48q0 42-58 42t-58-42z"/><path class="ink paper-fill" d="M183 102h29q25 0 25 23t-29 23h-26"/><path class="ink" d="M97 69q-12-17 2-31M127 69q-12-17 2-31M157 69q-12-17 2-31"/>',
   C6: '<path class="ink paper-fill" d="M64 43h143v125H64z"/><path class="ink accent-fill" d="M105 30h61v29h-61z"/><path class="ink" d="M85 83l10 10 18-22M85 116l10 10 18-22M124 83h59M124 116h59M124 145h42"/>',
+  C7: '<path class="ink paper-fill" d="M55 55h68v88H55zM174 55h68v88h-68z"/><path class="ink accent-fill" d="M123 82h51v34h-51z"/><path class="ink" d="M70 75h38M70 92h30M189 75h38M189 92h30M137 99h23"/>',
+  C8: '<path class="ink paper-fill" d="M72 37h132v132H72z"/><path class="ink accent-fill" d="M92 60h92v27H92z"/><path class="thin" d="M92 108h92M92 128h68M92 148h81"/><path class="ink" d="M210 75l19 19-45 45-25 5 5-25z"/>',
+  C9: '<circle class="ink paper-fill" cx="105" cy="98" r="48"/><circle class="ink accent-fill" cx="178" cy="98" r="48"/><path class="ink" d="M92 98l12 12 23-28M165 98l12 12 23-28M129 151h26"/>',
+  C10: '<path class="ink paper-fill" d="M57 82h178v55H57z"/><circle class="ink accent-fill" cx="94" cy="109" r="18"/><circle class="ink paper-fill" cx="146" cy="109" r="18"/><circle class="ink paper-fill" cx="198" cy="109" r="18"/><path class="ink" d="M78 45h136M146 45v37M126 45l20-18 20 18"/>',
+  C11: '<path class="ink paper-fill" d="M50 52h103v72H91l-26 22 7-22H50z"/><path class="ink accent-fill" d="M151 76h96v67h-28l8 22-29-22h-47z"/><path class="thin" d="M70 73h61M70 91h42M171 96h55M171 114h38"/>',
+  C12: '<path class="ink paper-fill" d="M64 39h139v129H64z"/><path class="ink accent-fill" d="M104 27h59v28h-59z"/><path class="ink" d="M85 78l9 9 16-19M85 108l9 9 16-19M85 138l9 9 16-19M122 79h61M122 109h61M122 139h61"/>',
 });
 
 export function cardIllustration(cardId, level = 1) {

@@ -1,26 +1,48 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
-import { buildRunRecord, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
+import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
+import { loadCareer, saveCareer, settleCase } from '../career/state.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
-let seed = new URL(location.href).searchParams.get('seed') ?? crypto.randomUUID();
-let setup = { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
+const params = new URL(location.href).searchParams;
+const careerMode = params.get('mode') === 'career';
+let careerLoad = careerMode ? loadCareer() : null;
+let career = careerLoad?.status === 'ready' ? careerLoad.career : null;
+let seed = params.get('seed') ?? crypto.randomUUID();
+let setup = career
+  ? { templateId: career.templateId, draw: openingChoices(seed, career.cards), selected: [], career }
+  : { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
 let state = null;
-let screen = 'intro';
+let screen = careerMode && !career ? 'career-error' : career ? 'cards' : 'intro';
 let selectedAction = null;
 let actionOptions = {};
 let lastResult = null;
 let operation = 0;
+let careerSettlement = null;
 let localCoach = null;
+let localAnalysis = null;
+let analysisRequest = 0;
 
 function view() { return state ? projectNarrativeView(state) : null; }
 
 function render() {
   const v = view();
-  if (screen === 'intro') root.innerHTML = renderIntro(setup);
+  if (screen === 'career-error') root.innerHTML = `<section class="hero screen"><div class="stage-copy"><div class="eyebrow">職涯模式無法開始</div><h1>先回大廳處理存檔</h1><p class="lede">${careerLoad?.reason ?? '目前沒有可用的職涯。'} 原存檔不會在這裡被覆寫。</p><div class="actions"><a class="button" href="./index.html">返回接案大廳</a><a class="button secondary" href="./case-01.html">改玩第一版單案</a></div></div></section>`;
+  else if (screen === 'intro') root.innerHTML = renderIntro(setup);
   else if (screen === 'cards') root.innerHTML = renderCards(setup);
-  else if (v?.ending) root.innerHTML = renderEnding(v, { localCoachAvailable: Boolean(localCoach) });
+  else if (v?.ending) {
+    if (careerMode && career && !careerSettlement) {
+      careerSettlement = settleCase(career, state);
+      career = saveCareer(careerSettlement.career);
+    }
+    root.innerHTML = renderEnding(v, {
+      careerMode,
+      expGained: careerSettlement?.expGained ?? 0,
+      localCoachAvailable: Boolean(localCoach),
+      localAnalysis,
+    });
+  }
   else if (screen === 'upgrade' && v.pendingUpgrade) root.innerHTML = renderUpgrade(v);
   else if (screen === 'preview') root.innerHTML = renderPreview(v, selectedAction, actionOptions, previewAction(state, selectedAction, actionOptions));
   else if (screen === 'result') root.innerHTML = renderResult(v, lastResult);
@@ -39,8 +61,33 @@ function render() {
 function nextOperation() { operation += 1; return `ui-${operation}`; }
 
 function start() {
-  state = createNarrativeGame({ seed, templateId: setup.templateId, selectedCards: setup.selected });
+  state = createNarrativeGame({
+    seed,
+    templateId: setup.templateId,
+    selectedCards: setup.selected,
+    ...(career ? { careerCards: career.cards, careerEquipped: career.equipped } : {}),
+  });
   screen = 'play'; render();
+}
+
+async function analyzeCurrentRun(reanalyze = false) {
+  const request = ++analysisRequest;
+  localAnalysis = { status: 'saving' };
+  render();
+  try {
+    const record = buildRunRecord(state);
+    const saved = await saveRunRecord(record, localCoach);
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'running', runId: saved.runId };
+    render();
+    const result = await analyzeRun(saved.runId, localCoach, { reanalyze });
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'done', runId: saved.runId, result };
+  } catch (error) {
+    if (request !== analysisRequest) return;
+    localAnalysis = { status: 'error', message: error.message };
+  }
+  render();
 }
 
 root.addEventListener('click', async (e) => {
@@ -99,6 +146,27 @@ root.addEventListener('click', async (e) => {
   if (e.target.closest('[data-continue]')) { screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
   const upgrade = e.target.closest('[data-upgrade]');
   if (upgrade) { state = chooseUpgrade(state, upgrade.dataset.upgrade); screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
+  if (e.target.closest('[data-analyze-run]')) {
+    await analyzeCurrentRun(false);
+    return;
+  }
+  if (e.target.closest('[data-reanalyze-run]')) {
+    await analyzeCurrentRun(true);
+    return;
+  }
+  if (e.target.closest('[data-cancel-analysis]')) {
+    const runId = localAnalysis?.runId;
+    if (!runId) return;
+    analysisRequest += 1;
+    try {
+      await cancelRunAnalysis(runId, localCoach);
+      localAnalysis = { status: 'error', message: '已取消這次分析，沒有產生講評。' };
+    } catch (error) {
+      localAnalysis = { status: 'error', message: error.message };
+    }
+    render();
+    return;
+  }
   const saveRun = e.target.closest('[data-save-run]');
   if (saveRun) {
     const status = root.querySelector('[data-save-status]');
@@ -122,16 +190,17 @@ root.addEventListener('click', async (e) => {
       const record = buildRunRecord(state);
       const download = downloadRunRecord(record);
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `已下載備份 ${download.fileName}（${download.bytes} bytes）。`;
+      if (status) status.textContent = `已下載 ${download.fileName}（${download.bytes} bytes）。請把檔案放進專案 runs 資料夾，MCP 教練才看得到。`;
     } catch (error) {
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `下載備份失敗：${error.message}`;
+      if (status) status.textContent = `匯出失敗：${error.message}`;
     }
     return;
   }
   if (e.target.closest('[data-new]')) {
+    analysisRequest += 1;
     seed = crypto.randomUUID(); setup = { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
-    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; render();
+    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; localAnalysis = null; render();
   }
 });
 
@@ -169,17 +238,21 @@ async function discoverLocalCoach() {
     const capability = await response.json();
     if (capability?.schema !== 'ai-engineer-game.local-coach.v1'
       || capability.endpoint !== '/api/local-coach/runs'
+      || capability.analysisEndpoint !== '/api/local-coach/analyze'
+      || capability.cancelEndpoint !== '/api/local-coach/cancel'
       || typeof capability.csrfToken !== 'string'
       || !/^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken)) return;
     localCoach = {
       schema: capability.schema,
       endpoint: capability.endpoint,
+      analysisEndpoint: capability.analysisEndpoint,
+      cancelEndpoint: capability.cancelEndpoint,
       csrfToken: capability.csrfToken,
     };
     render();
   } catch {
-    // 靜態託管或已停止的本機 server 都不顯示教練入口。
+    // 靜態頁面或已停止的本機 server 不顯示教練入口。
   }
 }
 
-discoverLocalCoach();
+// GitHub Pages is a static build: do not probe localhost or any server capability.
