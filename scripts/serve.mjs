@@ -60,7 +60,7 @@ export function startServer({ port = 8080, root = ROOT, quiet = false } = {}) {
     server.listen(port, HOST, () => {
       if (!quiet) {
         const { port: actual } = server.address();
-        console.log(`AI 工程接案遊戲（v0.3-T3）已啟動：http://${HOST}:${actual}/`);
+        console.log(`AI 工程接案遊戲已啟動：http://${HOST}:${actual}/`);
         console.log(`敘事案件 01：http://${HOST}:${actual}/case-01.html`);
         console.log('按 Ctrl+C 停止。');
       }
