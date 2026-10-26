@@ -12,14 +12,48 @@
 
 ## 1. 首次啟用本機一鍵講評
 
-本次驗證環境是Windows、Node.js 24.20.0與Claude Code 2.1.310；其他版本與作業系統未獨立驗證。現有橋接只查找預設的`%USERPROFILE%\.local\bin\claude.exe`，安裝在其他位置會明確回報橋接不可用。先用正常流程完成訂閱帳號登入，再於clone後的專案根目錄執行：
+本次驗證環境是 Windows、Node.js 24.20.0 與 Claude Code 2.1.310；這些是驗證環境，不是任意版本的最低需求，其他版本與作業系統未獨立驗證。
+
+首次使用請先安裝：
+
+- [Git for Windows](https://git-scm.com/install/windows)
+- [Node.js](https://nodejs.org/en/download)
+- [Claude Code](https://code.claude.com/docs/en/setup)
+
+開啟新的 PowerShell，檢查版本與橋接固定查找的 Claude Code 路徑：
 
 ```powershell
-claude mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
-claude
+git --version
+node --version
+$claude = "$env:USERPROFILE\.local\bin\claude.exe"
+& $claude --version
 ```
 
-第一次進入Claude Code後輸入`/mcp`，檢查server名稱與命令確實是此專案的`ai_game_runs`，再由使用者親自核准。不要使用跳過權限的參數。完成後可退出這個互動Claude視窗。
+現有橋接只查找 Windows 預設的 `%USERPROFILE%\.local\bin\claude.exe`；安裝在其他位置會明確回報橋接不可用。目前不承諾其他作業系統或安裝路徑。
+
+尚未下載專案時，先執行：
+
+```powershell
+git clone https://github.com/trueroyce/ai-engineer-game.git
+cd ai-engineer-game
+```
+
+專案沒有第三方套件相依，不需要執行 `npm install`。
+
+依 [Claude Code 官方登入說明](https://code.claude.com/docs/en/iam)，從專案目錄正常啟動 Claude Code。第一次啟動會引導你在瀏覽器完成登入；不需要另設 API key：
+
+```powershell
+& $claude
+```
+
+完成登入後退出互動視窗，在同一個專案根目錄加入 project-scoped MCP，並再次啟動 Claude Code：
+
+```powershell
+& $claude mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
+& $claude
+```
+
+輸入 `/mcp`，檢查 server 名稱與命令確實是此專案的 `ai_game_runs`，再由使用者親自核准。不要使用 `--bare` 或跳過權限的參數。完成後可退出這個互動 Claude 視窗。
 
 日常啟動：
 
@@ -48,10 +82,10 @@ npm run test:mcp
 若一鍵流程暫時不可用，也可沿用手動唯讀MCP，不需再建立第二個server。若尚未完成上面的首次設定，在專案根目錄執行：
 
 ```powershell
-claude mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
+& "$env:USERPROFILE\.local\bin\claude.exe" mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
 ```
 
-接著在這個專案啟動互動式 `claude`。Claude Code 對 project-scoped `.mcp.json` 會要求 workspace/server approval；請檢視後自行決定是否核准。不要用 bypass 權限來省略這一步。可用下列唯讀命令查看設定狀態：
+接著在這個專案執行 `& "$env:USERPROFILE\.local\bin\claude.exe"` 啟動互動式 Claude Code。Claude Code 對 project-scoped `.mcp.json` 會要求 workspace/server approval；請檢視後自行決定是否核准。不要用 bypass 權限來省略這一步。可用下列唯讀命令查看設定狀態：
 
 ```powershell
 claude mcp list
@@ -63,8 +97,6 @@ claude mcp get ai_game_runs
 `list_runs` 目前不記錄或推斷時間，順序也不代表新舊；請從清單明確選一個 `runId`，再交給 `get_run`。例如：
 
 > 請先用 list_runs 列出局紀錄，顯示每局的 runId 與結局，等我指定一個 runId 後再用 get_run 分析。把當時可知的決策品質、觀察到的骰運與資源代價分開，最後提出三個下一局可操作建議；不要猜未揭露缺陷。
-
-本次沒有自動執行 add、沒有建立 `.mcp.json`、沒有修改 `~/.claude.json`，也沒有替使用者接受任何權限。
 
 ## 4. 安全與資料使用邊界
 
@@ -82,7 +114,17 @@ claude mcp get ai_game_runs
 ## 官方依據
 
 - Claude Code MCP（stdio、project scope、approval）：https://code.claude.com/docs/en/mcp
+- Claude Code 安裝：https://code.claude.com/docs/en/setup
+- Claude Code 登入：https://code.claude.com/docs/en/iam
+- Git for Windows：https://git-scm.com/install/windows
+- Node.js 下載：https://nodejs.org/en/download
 - MCP 2025-11-25 lifecycle：https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
 - MCP 2025-11-25 stdio transport：https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 - MCP 2025-11-25 tools：https://modelcontextprotocol.io/specification/2025-11-25/server/tools
 - Claude Code data usage：https://code.claude.com/docs/en/data-usage
+
+## 最短故障排除
+
+- **找不到 Claude executable**：執行 `Test-Path "$env:USERPROFILE\.local\bin\claude.exe"`。若為 `False`，依官方安裝說明重新安裝到 Windows 預設位置；目前橋接不會搜尋其他路徑。
+- **尚未登入或登入已失效**：在專案目錄執行 `& "$env:USERPROFILE\.local\bin\claude.exe"`，依瀏覽器提示完成正常登入，再回到遊戲重試。
+- **MCP 顯示 `Pending approval` 或未連線**：在專案目錄啟動 Claude Code，輸入 `/mcp`，核對 `ai_game_runs` 的命令後親自核准；可用 `& "$env:USERPROFILE\.local\bin\claude.exe" mcp get ai_game_runs` 再查狀態。

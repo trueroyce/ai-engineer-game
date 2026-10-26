@@ -1,6 +1,6 @@
 # AI 工程接案遊戲
 
-一款不用真的燒掉 API 額度、但會讓你感受到接案精神壓力的單案敘事瀏覽器遊戲。
+一款在純靜態 GitHub Pages 遊玩時不用燒 API 額度、但會讓你感受到接案精神壓力的單案敘事瀏覽器遊戲；本機一鍵 Claude 賽後講評則會使用登入帳號的額度。
 
 玩家先選擇工程師模板與工具卡，再處理一個看似簡單的待辦工具案件。需求理解、實作、驗證、修復與交付都有多種過程；角色能力、工具卡、公開案件狀態與隨機事件共同影響結果。靜態遊戲不呼叫外部模型，也不會修改玩家電腦上的專案；本機clone後可由玩家明確按下按鈕，選擇使用Claude Code做賽後講評。
 
@@ -12,9 +12,52 @@ GitHub Pages 只包含靜態遊戲，不渲染賽後教練入口，也不會呼�
 
 ## 本機啟動
 
-本次公開版在Node.js 24.20.0與現代Chrome／Edge完成驗證；其他Node.js版本未獨立驗證。
+以下流程適用 Windows。本次公開版是在 Node.js 24.20.0、Claude Code 2.1.310 與現代 Chrome／Edge 完成驗證；這些是驗證環境，不是任意版本的最低需求，其他版本與作業系統尚未獨立驗證。
 
-一鍵賽後講評的本次驗證環境是Windows與Claude Code 2.1.310。現有橋接只查找預設的`%USERPROFILE%\.local\bin\claude.exe`；安裝在其他位置會明確回報橋接不可用，目前不承諾其他作業系統或安裝路徑。使用前先以正常Claude Code登入流程完成訂閱帳號登入；不需要另設API key，也不要使用`--bare`或跳過權限的參數。
+### 1. 安裝並檢查工具
+
+- [Git for Windows 官方安裝頁](https://git-scm.com/install/windows)
+- [Node.js 官方下載頁](https://nodejs.org/en/download)
+- [Claude Code 官方安裝說明](https://code.claude.com/docs/en/setup)
+
+安裝後開啟新的 PowerShell，檢查版本與橋接需要的 Claude Code 預設路徑：
+
+```powershell
+git --version
+node --version
+& "$env:USERPROFILE\.local\bin\claude.exe" --version
+```
+
+現有橋接只查找 Windows 預設的 `%USERPROFILE%\.local\bin\claude.exe`；即使 `claude` 在 PATH 中可用，安裝在其他位置仍會明確回報橋接不可用。目前不承諾其他作業系統或安裝路徑。
+
+### 2. 下載專案
+
+```powershell
+git clone https://github.com/trueroyce/ai-engineer-game.git
+cd ai-engineer-game
+```
+
+專案沒有第三方套件相依，不需要執行 `npm install`。
+
+### 3. 登入 Claude Code 並核准 MCP
+
+依 [Claude Code 官方登入說明](https://code.claude.com/docs/en/iam)，先從專案目錄啟動 Claude Code；第一次啟動會引導你在瀏覽器完成正常登入：
+
+```powershell
+$claude = "$env:USERPROFILE\.local\bin\claude.exe"
+& $claude
+```
+
+完成登入後退出互動視窗，在同一個專案目錄加入 project-scoped MCP，再次啟動 Claude Code：
+
+```powershell
+& $claude mcp add ai_game_runs --scope project -- node scripts/mcp-postgame-coach.mjs
+& $claude
+```
+
+在 Claude Code 輸入 `/mcp`，確認 `ai_game_runs` 指向本專案的 `scripts/mcp-postgame-coach.mjs`，再親自核准。不要使用 `--bare` 或跳過權限的參數。完整設定與故障排除請見 [MCP 使用說明](docs/mcp/README.md)。
+
+### 4. 啟動遊戲
 
 ```powershell
 npm start -- 8081
