@@ -1,0 +1,12 @@
+# 玩家自行放入的局紀錄只留本機；目錄說明與占位檔仍可版本控制。
+runs/*.json
+
+# 本機 Claude Code MCP 設定與核准；公開 release 不攜帶環境設定。
+.mcp.json
+.claude/settings.local.json
+
+# 瀏覽器回歸產物只留本機，不進公開 release。
+docs/testing/artifacts/
+
+# 瀏覽器下載中的暫存檔。
+*.crdownload
