@@ -155,6 +155,40 @@ export function serializeRunRecord(record) {
   return `${JSON.stringify(record, null, 2)}\n`;
 }
 
+export async function saveRunRecord(record, capability, environment = globalThis) {
+  validateRunRecord(record);
+  if (!capability
+    || capability.schema !== 'ai-engineer-game.local-coach.v1'
+    || capability.endpoint !== '/api/local-coach/runs'
+    || typeof capability.csrfToken !== 'string'
+    || !/^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken)) {
+    throw new Error('本機賽後教練連線資訊無效');
+  }
+  const response = await environment.fetch(capability.endpoint, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-AIEG-CSRF': capability.csrfToken,
+    },
+    body: serializeRunRecord(record),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  let result;
+  try { result = await response.json(); }
+  catch { throw new Error('本機賽後教練回應格式無效'); }
+  if (!response.ok || result?.ok !== true || result.runId !== record.runId) {
+    throw new Error(result?.error?.message ?? `本機儲存失敗（HTTP ${response.status}）`);
+  }
+  return {
+    runId: result.runId,
+    fileName: result.fileName,
+    created: Boolean(result.created),
+    idempotent: Boolean(result.idempotent),
+  };
+}
+
 export function downloadRunRecord(record, environment = globalThis) {
   const json = serializeRunRecord(record);
   const blob = new environment.Blob([json], { type: 'application/json;charset=utf-8' });

@@ -1,6 +1,6 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
-import { buildRunRecord, downloadRunRecord } from '../postgame/run-export.js';
+import { buildRunRecord, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
@@ -12,6 +12,7 @@ let selectedAction = null;
 let actionOptions = {};
 let lastResult = null;
 let operation = 0;
+let localCoach = null;
 
 function view() { return state ? projectNarrativeView(state) : null; }
 
@@ -19,7 +20,7 @@ function render() {
   const v = view();
   if (screen === 'intro') root.innerHTML = renderIntro(setup);
   else if (screen === 'cards') root.innerHTML = renderCards(setup);
-  else if (v?.ending) root.innerHTML = renderEnding(v);
+  else if (v?.ending) root.innerHTML = renderEnding(v, { localCoachAvailable: Boolean(localCoach) });
   else if (screen === 'upgrade' && v.pendingUpgrade) root.innerHTML = renderUpgrade(v);
   else if (screen === 'preview') root.innerHTML = renderPreview(v, selectedAction, actionOptions, previewAction(state, selectedAction, actionOptions));
   else if (screen === 'result') root.innerHTML = renderResult(v, lastResult);
@@ -42,7 +43,7 @@ function start() {
   screen = 'play'; render();
 }
 
-root.addEventListener('click', (e) => {
+root.addEventListener('click', async (e) => {
   const template = e.target.closest('[data-template]');
   if (template) {
     setup.templateId = template.dataset.template; render(); return;
@@ -98,15 +99,33 @@ root.addEventListener('click', (e) => {
   if (e.target.closest('[data-continue]')) { screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
   const upgrade = e.target.closest('[data-upgrade]');
   if (upgrade) { state = chooseUpgrade(state, upgrade.dataset.upgrade); screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
+  const saveRun = e.target.closest('[data-save-run]');
+  if (saveRun) {
+    const status = root.querySelector('[data-save-status]');
+    saveRun.disabled = true;
+    if (status) status.textContent = '正在安全寫入本機 runs…';
+    try {
+      const record = buildRunRecord(state);
+      const saved = await saveRunRecord(record, localCoach);
+      if (status) status.textContent = saved.idempotent
+        ? `這局已在本機 runs：${saved.runId}`
+        : `已存入本機 runs：${saved.runId}`;
+    } catch (error) {
+      if (status) status.textContent = `儲存失敗：${error.message}`;
+    } finally {
+      saveRun.disabled = false;
+    }
+    return;
+  }
   if (e.target.closest('[data-export-run]')) {
     try {
       const record = buildRunRecord(state);
       const download = downloadRunRecord(record);
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `已下載 ${download.fileName}（${download.bytes} bytes）。請把檔案放進專案 runs 資料夾，MCP 教練才看得到。`;
+      if (status) status.textContent = `已下載備份 ${download.fileName}（${download.bytes} bytes）。`;
     } catch (error) {
       const status = root.querySelector('[data-export-status]');
-      if (status) status.textContent = `匯出失敗：${error.message}`;
+      if (status) status.textContent = `下載備份失敗：${error.message}`;
     }
     return;
   }
@@ -138,3 +157,29 @@ window.__AIEG_NARRATIVE_TEST__ = {
 };
 
 render();
+
+async function discoverLocalCoach() {
+  try {
+    const response = await fetch('/api/local-coach/capability', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok || !String(response.headers.get('content-type')).toLowerCase().startsWith('application/json')) return;
+    const capability = await response.json();
+    if (capability?.schema !== 'ai-engineer-game.local-coach.v1'
+      || capability.endpoint !== '/api/local-coach/runs'
+      || typeof capability.csrfToken !== 'string'
+      || !/^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken)) return;
+    localCoach = {
+      schema: capability.schema,
+      endpoint: capability.endpoint,
+      csrfToken: capability.csrfToken,
+    };
+    render();
+  } catch {
+    // 靜態託管或已停止的本機 server 都不顯示教練入口。
+  }
+}
+
+discoverLocalCoach();
