@@ -1,4 +1,5 @@
-import { CARDS, TEMPLATES } from '../narrative/rules.js';
+import { TEMPLATES } from '../narrative/rules.js';
+import { CARDS } from '../career/cards.js';
 import { CASE02_ACTIONS, CONTRACT_OPTIONS, NORMALIZATION_STRATEGIES } from './rules.js';
 import { case02CardLevel, case02PublicView, previewCase02Action } from './engine-v2.js';
 
@@ -23,8 +24,9 @@ export function renderCase02Error(reason) {
 
 export function renderCase02Intro(career) {
   const template = TEMPLATES[career.templateId];
-  const equipped = career.equipped.length
-    ? career.equipped.map((id) => `<span class="tag">${esc(CARDS[id].name)} Lv.${career.cards[id]}</span>`).join('')
+  const loadout = career.loadoutsByCase?.['case-02'] ?? career.equipped ?? [];
+  const equipped = loadout.length
+    ? loadout.map((id) => `<span class="tag">${esc(CARDS[id].name)} Lv.${career.cards[id]}</span>`).join('')
     : '<span class="tag">沒有裝備卡，也能完成</span>';
   return shell(`<section class="hero">${icon('merge')}<div class="eyebrow">進階案件 · 不鎖等級</div><h1>三張表格，<br>一份真相</h1><p class="lede">客戶說只是把 customers、invoices、refunds 合在一起。三張表分別使用 customer_id、client_no 和自己的日期格式；17:58 還會多一條退款規則。你可以獨作或派模擬 agent，但最後的契約與交付決策仍是你的。</p><p class="notice">這是遊戲內模擬：不會啟動真 sub-agent、不讀外部 CSV、不呼叫模型或連網。</p><div class="owned"><strong>${esc(template.name)} · 需求 ${template.attrs.A}／工程 ${template.attrs.E}／驗證 ${template.attrs.V}</strong><div>${equipped}</div></div><div class="actions"><button class="primary" data-start-case>讀三張表，開始接案</button></div></section><section><h2>公開來源資訊</h2><div class="source-grid"><article class="source-card"><span class="eyebrow">customers.csv</span><h3>客戶主檔</h3><p><code>customer_id</code><code>email</code><code>created_at</code></p><small>日期：ISO；每位客戶一列。</small></article><article class="source-card"><span class="eyebrow">invoices.csv</span><h3>發票匯出</h3><p><code>client_no</code><code>invoice_date</code><code>amount</code></p><small>日期：YYYY/MM/DD；可能重複匯出同發票。</small></article><article class="source-card"><span class="eyebrow">refunds.csv</span><h3>退款紀錄</h3><p><code>customer_id</code><code>processed_at</code><code>amount</code></p><small>日期：ISO；17:58 會補上截止與原因規則。</small></article></div></section>`);
 }
@@ -93,22 +95,27 @@ export function renderCase02Preview(state, actionId, options) {
 export function renderCase02Result(state, result) {
   const view = case02PublicView(state);
   const beats = result.process ? [result.process.player, result.process.response, result.process.followUp, result.process.consequence] : [];
-  return shell(`${hud(view)}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">工作結果 · 公開證據</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case02-continue>${view.pendingReward ? '先處理卡片獎勵' : '回工作板'}</button></div></section>`);
+  const outcomeLabels = { success: '成功', partial: '部分成功', failure: '未成功' };
+  const attempt = result.attempt ? `<p class="notice">本次公開機率 ${result.attempt.chance}% · 結果 ${outcomeLabels[result.attempt.outcome] ?? '已處理'}${result.attempt.retry ? ` · 重試理解 +${result.attempt.retryLearningGain}` : ''}${result.attempt.sequel > 1 ? ` · 事件續篇 ${result.attempt.sequel}` : ''}</p>` : '';
+  return shell(`${hud(view)}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">工作結果 · 公開證據</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${attempt}${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case02-continue>${view.pendingReward ? '先處理本局成長獎勵' : '回工作板'}</button></div></section>`);
 }
 
 export function renderCase02Reward(state) {
   const view = case02PublicView(state);
   const cards = view.pendingReward.choices.map((id) => {
+    const option = view.pendingReward.options?.find((item) => item.id === id || item.cardId === id);
+    if (option && option.kind !== 'card') return `<button class="reward-card" data-case02-reward="${esc(id)}"><span class="eyebrow">永久職涯替代獎勵</span><h3>${esc(option.title)}</h3><p>${esc(option.description)}</p></button>`;
     const level = state.cards[id] ?? 0;
     const full = state.equipped.length >= 3 && !state.equipped.includes(id);
     const mode = level ? `融合 Lv.${level} → Lv.${Math.min(2, level + 1)}` : full ? '收藏，不自動換掉裝備' : '收藏並自動裝備';
     return `<button class="reward-card" data-case02-reward="${id}"><span class="eyebrow">${esc(mode)}</span><h3>${esc(CARDS[id].name)}</h3><p>${esc(level ? CARDS[id].upgradeDescription : CARDS[id].description)}</p></button>`;
   }).join('');
-  return shell(`${hud(view)}<section class="panel reward-screen"><div class="eyebrow">一次性整合工具獎勵</div><h1>新卡、融合，或先收進卡庫</h1><p class="lede">滿三張裝備也不用丟卡；新卡會收藏。這個 reward ID 每個職涯只會出現一次。</p><div class="reward-grid">${cards}</div></section>`);
+  return shell(`${hud(view)}<section class="panel reward-screen"><div class="eyebrow">本局成長 ${view.pendingReward.slot} / 2</div><h1>三選一：收藏、融合或永久替代</h1><p class="lede">每次合法遊玩可在第 2、4 個實質進度各領一次；同局刷新不重領，下一局可再次成長。</p><div class="reward-grid">${cards}</div></section>`);
 }
 
 export function renderCase02Ending(state, settlement) {
   const view = case02PublicView(state);
   const ending = state.ending;
-  return shell(`<section class="ending"><div class="hero">${icon('table')}<div class="eyebrow">案件 02 結算 · ${esc(ending.baseId)}</div><h1>${esc(ending.title)}</h1><p class="lede">${esc(ending.text)}</p><p class="notice">本次新增 ${settlement?.expGained ?? 0} EXP；同一 milestone 與卡片 reward 不會重複領取。Token、壓力與時間不帶回大廳。</p>${view.blockers.length ? `<h2>結案時公開缺口</h2><ul>${view.blockers.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>` : '<p class="notice good">契約、測試與追溯全部對齊。</p>'}<div class="actions"><a class="button primary" href="./index.html" data-return-lobby>返回接案大廳</a></div></div></section>`);
+  const facets = ending.playFacets?.length ? `<div class="source-grid">${ending.playFacets.map((facet) => `<article class="source-card"><span class="eyebrow">本局稱號</span><h3>${esc(facet.title)}</h3><p>${esc(facet.text)}</p></article>`).join('')}</div>` : '';
+  return shell(`<section class="ending"><div class="hero">${icon('table')}<div class="eyebrow">案件 02 結算</div><h1>${esc(ending.title)}</h1><p class="lede">${esc(ending.text)}</p>${facets}<p class="notice">本次新增 ${settlement?.expGained ?? 0} EXP；同一局的里程碑與獎勵不會因刷新重領，合法重玩則會建立新 run。Token、壓力與時間不帶回大廳。</p>${view.blockers.length ? `<h2>結案時公開缺口</h2><ul>${view.blockers.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>` : '<p class="notice good">契約、測試與追溯全部對齊。</p>'}<div class="actions"><a class="button primary" href="./index.html" data-return-lobby>返回接案大廳</a></div></div></section>`);
 }

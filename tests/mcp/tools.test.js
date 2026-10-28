@@ -7,7 +7,7 @@ import path from 'node:path';
 import { createRunStore } from '../../src/mcp/run-store.js';
 import { createToolService, TOOL_DEFINITIONS } from '../../src/mcp/tools.js';
 import { RUN_LIMITS } from '../../src/postgame/run-schema.js';
-import { syntheticRun, sha256 } from './fixtures.js';
+import { syntheticCase02Run, syntheticCase03Run, syntheticRun, sha256 } from './fixtures.js';
 
 async function fixture(t, record) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'aieg-mcp-tools-'));
@@ -49,8 +49,22 @@ test('list/get/rules return public evidence and keep injected text inert and byt
   const rules = payload(await service.call('get_rules', {}));
   assert.equal(rules.gameSchemaVersion, 'ai-engineer-game.run.v1');
   assert.match(rules.knowledgeBoundary, /不提供事件權重/);
+  assert.deepEqual(Object.keys(rules.publicRulesByCase).sort(), ['case-01', 'case-02', 'case-03']);
   assert.equal(sha256(await fs.readFile(file)), hash, 'read-only calls must not mutate fixture');
 });
+
+for (const record of [syntheticCase02Run(), syntheticCase03Run()]) {
+  test(`MCP lists and reads ${record.caseId} without changing the record`, async (t) => {
+    const { service, file, hash } = await fixture(t, record);
+    const listed = payload(await service.call('list_runs', {}));
+    assert.equal(listed.runs[0].runId, record.runId);
+    assert.equal(listed.runs[0].caseId, record.caseId);
+    const read = payload(await service.call('get_run', { run_id: record.runId, detail: 'full' }));
+    assert.equal(read.record.gameRuleVersion, record.gameRuleVersion);
+    assert.equal(read.record.timeline.at(-1).kind, 'delivery');
+    assert.equal(sha256(await fs.readFile(file)), hash);
+  });
+}
 
 test('known-tool data failures use isError while invalid arguments throw parameter errors', async (t) => {
   const { service } = await fixture(t, syntheticRun({ seed: 'tools-errors' }));

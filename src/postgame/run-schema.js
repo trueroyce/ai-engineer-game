@@ -1,5 +1,11 @@
 export const RUN_SCHEMA_VERSION = 'ai-engineer-game.run.v1';
-export const SUPPORTED_GAME_RULE_VERSIONS = Object.freeze(['case-01-narrative@2']);
+export const SUPPORTED_GAME_RULE_VERSIONS = Object.freeze(['case-01-narrative@2', 'case-02-csv@2', 'case-03-booking@1']);
+
+const RULE_CASE = Object.freeze({
+  'case-01-narrative@2': 'case-01',
+  'case-02-csv@2': 'case-02',
+  'case-03-booking@1': 'case-03',
+});
 
 export const RUN_LIMITS = Object.freeze({
   maxFileBytes: 256 * 1024,
@@ -111,6 +117,7 @@ export function validateRunRecord(record) {
   if (!RUN_ID.test(record.runId)) fail('invalid_schema', 'runId 格式不合法');
   if (!SUPPORTED_GAME_RULE_VERSIONS.includes(record.gameRuleVersion)) fail('unsupported_rule_version', '不支援的規則版本');
   id(record.caseId, 'caseId');
+  if (RULE_CASE[record.gameRuleVersion] !== record.caseId) fail('invalid_schema', 'caseId and gameRuleVersion do not match');
 
   object(record.knowledgeBoundary, 'knowledgeBoundary');
   exactKeys(record.knowledgeBoundary, ['playerVisibleOnly', 'hiddenTerminalTruthIncluded', 'note'], 'knowledgeBoundary');

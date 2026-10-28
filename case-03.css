@@ -1,0 +1,19 @@
+@import url("./case-02.css");
+
+:root {
+  --paper: #f4efff;
+  --panel: #fffdf8;
+  --mint: #c6b8ff;
+  --teal: #5a348a;
+  --amber: #ffe08a;
+  --coral: #ff8e80;
+  --blue: #a9dcff;
+}
+
+body { background: linear-gradient(135deg, #f6efff, #eaf7ff); }
+.hero:after { content: "NPC"; color: #e9e0ff; letter-spacing: -.08em; }
+.action-card .mark { background: #d9ceff; }
+.beat b { background: #c6b8ff; }
+.ending .hero { background: linear-gradient(145deg, #fffdf8, #eee6ff); }
+.case03-art .client,.case03-status .client{fill:#ffe08a;stroke:var(--ink);stroke-width:4}.case03-art .designer,.case03-status .designer{fill:#ffb7d3;stroke:var(--ink);stroke-width:4}.case03-art .engineer,.case03-status .engineer{fill:#a9dcff;stroke:var(--ink);stroke-width:4}.case03-art .contract{fill:#fffdf8;stroke:var(--ink);stroke-width:4}.case03-art .revision{fill:#c6b8ff;stroke:var(--ink);stroke-width:4}.case-workspace>.case03-art,.action-card .case03-art,.preview-scene .case03-art,.result-scene .case03-art{background:#f5efff}.ending-stage{background:linear-gradient(145deg,#fffdf8,#eee6ff)}.ending-badge:nth-child(odd){background:#ffe08a}.ending-badge:nth-child(even){background:#d9ceff}
+.case03-art .speaker-face{fill:#ffb7d3}.case03-art .speech{fill:#fff9ff}.result-tone-good{background:#f1fff7;border-color:#236b57;box-shadow:8px 8px 0 #236b57}.result-tone-warn{background:#fff8d9;border-color:#8a6100;box-shadow:8px 8px 0 #8a6100}.result-tone-bad{background:#fff0f4;border-color:#9d2c55;box-shadow:8px 8px 0 #9d2c55}.result-tone-good .result-scene .case03-art{background:#ddf6e9;border-color:#236b57}.result-tone-warn .result-scene .case03-art{background:#fff0b8;border-color:#8a6100}.result-tone-bad .result-scene .case03-art{background:#ffd9e6;border-color:#9d2c55}.case03-art.tone-good .backdrop{fill:#ddf6e9;stroke:#236b57}.case03-art.tone-warn .backdrop{fill:#fff0b8;stroke:#8a6100}.case03-art.tone-bad .backdrop{fill:#ffd9e6;stroke:#9d2c55}

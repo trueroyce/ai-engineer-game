@@ -220,14 +220,14 @@ async function localCoachPost(endpoint, body, capability, environment) {
 }
 
 export async function analyzeRun(runId, capability, { reanalyze = false } = {}, environment = globalThis) {
-  if (typeof runId !== 'string' || !/^case01-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  if (typeof runId !== 'string' || !/^case0[123]-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
   const result = await localCoachPost(capability.analysisEndpoint, { runId, reanalyze }, capability, environment);
   if (result.runId !== runId || !result.critique || typeof result.critique !== 'object') throw new Error('Claude 講評回應不完整');
   return result;
 }
 
 export async function cancelRunAnalysis(runId, capability, environment = globalThis) {
-  if (typeof runId !== 'string' || !/^case01-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  if (typeof runId !== 'string' || !/^case0[123]-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
   return localCoachPost(capability.cancelEndpoint, { runId }, capability, environment);
 }
 

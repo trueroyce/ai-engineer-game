@@ -1,19 +1,46 @@
 import { createStream, drawD100, drawSample, randomSeed } from '../core/rng.js';
-import { CARDS, TEMPLATES } from '../narrative/rules.js';
+import { TEMPLATES } from '../narrative/rules.js';
+import { CARDS } from '../career/cards.js';
+import { applyIntegrationShield, applyMajorChangeEvidence, applySpendRefund } from '../career/card-runtime.js';
+import { choosePendingRunReward, grantRunProgress, initializeRunRewards } from '../career/run-rewards.js';
+import { initializeCaseAttempts, previewCaseAttempt, reviseCaseAttempts, runCaseAttempt } from '../core/case-attempt.js';
+import { composeEndingFacets } from '../core/ending-facets.js';
 import { CASE03_LIMITS, CASE03_REWARD_ID, CASE03_REWARD_POOL, STRATEGIES } from './rules.js';
 
 const clone = (value) => structuredClone(value);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const level = (state, id) => state.equipped.includes(id) ? (state.cards[id] ?? 0) : 0;
 const payload = (actionId, raw) => JSON.stringify({ actionId, ...Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'stateVersion')) });
+const FAILURE_EVENTS = Object.freeze({
+  C01: [{ id: 'three-later', weight: 55 }, { id: 'owner-vacuum', weight: 45 }],
+  C02: [{ id: 'thumbs-up-contract', weight: 55 }, { id: 'timezone-emoji', weight: 45 }],
+  C03: [{ id: 'payload-drift', weight: 50 }, { id: 'button-twins', weight: 50 }],
+  C04: [{ id: 'cancel-note-conflict', weight: 55 }, { id: 'review-tourist', weight: 45 }],
+  C05: [{ id: 'decision-elevator', weight: 60 }, { id: 'limit-sidequest', weight: 40 }],
+  C06: [{ id: 'dst-runner', weight: 55 }, { id: 'trace-gap', weight: 45 }],
+  C08: [{ id: 'field-nickname', weight: 55 }, { id: 'repair-rebase', weight: 45 }],
+});
+
+function attemptConfig(state, actionId, ability, base, bonus = 0) {
+  return { actionId, semanticKey: actionId, ability, baseChance: base, modifiers: bonus ? [{ id: 'strategy', label: '公開策略與卡片', value: bonus }] : [], events: FAILURE_EVENTS[actionId] ?? [{ id: 'coordination-drift', weight: 100 }], boundaryAction: ['C01', 'C02', 'C04', 'C05'].includes(actionId), separateFailureDraw: state.progressionV2 !== false };
+}
+
+function withAttemptPreview(state, preview, actionId, ability, base, bonus = 0) {
+  const attempt = previewCaseAttempt(state, attemptConfig(state, actionId, ability, base, bonus));
+  const retryTokenDiscount = attempt.retry && level(state, 'C13') ? 1 : 0;
+  return {
+    ...preview,
+    token: Math.max(1, preview.token - retryTokenDiscount),
+    time: Math.max(0, preview.time - attempt.retryTimeDiscount),
+    retryTokenDiscount,
+    attempt,
+  };
+}
 
 function event(state, actionId, ability, base, bonus = 0) {
-  const threshold = clamp(base + state.abilities[ability] * 5 + bonus, 20, 95);
-  const draw = drawD100(state.rng.event);
-  state.rng.event = draw.stream;
-  const success = draw.value <= threshold;
-  state.eventAudit.push({ actionId, ability, threshold, roll: draw.value, index: draw.index, success });
-  return success;
+  const attempt = runCaseAttempt(state, { ...attemptConfig(state, actionId, ability, base, bonus), operationId: `attempt:${actionId}:${state.stateVersion}` });
+  state.lastAttempt = attempt;
+  return attempt.outcome !== 'failure';
 }
 
 function process(title, summary, player, npc, followUp, consequence, outcome) {
@@ -26,10 +53,19 @@ function spend(state, preview) {
   state.token -= preview.token;
   state.timeLeft -= preview.time;
   state.stress = clamp(state.stress + preview.stress, 0, CASE03_LIMITS.stressCap);
+  const refund = applySpendRefund(state, { cards: state.cards, equipped: state.equipped, tokenCost: preview.token });
+  Object.assign(state, refund.state);
+  return refund.refunded;
 }
 
 function milestone(state, id) { if (!state.ledger.includes(id)) state.ledger.push(id); }
 function revoke(state, id) { state.ledger = state.ledger.filter((item) => item !== id); }
+
+function recordMeaningfulAttempt(state, actionId) {
+  if (state.progressionV2 && ['C01', 'C02', 'C03', 'C04', 'C05', 'C06'].includes(actionId)) {
+    grantRunProgress(state, `attempt:${actionId}`);
+  }
+}
 
 function rewardCandidates(state) {
   return CASE03_REWARD_POOL.filter((id) => (state.cards[id] ?? 0) < CARDS[id].maxLevel);
@@ -54,45 +90,52 @@ export function createCase03Game(options = {}) {
   const cards = clone(options.cards ?? {});
   const equipped = (options.equipped ?? []).filter((id) => cards[id]).slice(0, 3);
   const seed = Number.isInteger(options.seed) ? options.seed >>> 0 : randomSeed();
-  return {
+  const state = {
     caseId: 'case-03', ruleVersion: 'case-03-booking@1', phase: 'playing', templateId: options.templateId,
     abilities: clone(TEMPLATES[options.templateId].attrs), token: 18, stress: 0, timeLeft: 12,
     cards, equipped, requirements: null, contract: null, implementation: null, merge: null,
     change: { announced: false, handled: false }, evidence: { revision: null, coverage: 0, trace: false, failed: [] },
     artifactRevision: 0, integrationDebt: 0, ledger: [], rewardClaims: [], pendingReward: null, rewardFallback: null,
     rewardLedgerSnapshot: clone(options.rewardLedger ?? []), stateVersion: 0, operationResults: {}, operationPayloads: {}, log: [], ending: null,
-    seed, rng: { event: createStream(options.eventRolls ? { values: options.eventRolls } : { seed }), reward: createStream(options.rewardDraws ? { values: options.rewardDraws } : { seed: seed ^ 0x31ca5e03 }) }, eventAudit: [],
+    seed, rng: { event: createStream(options.eventRolls ? { values: options.eventRolls } : { seed }), reward: createStream(options.rewardDraws ? { values: options.rewardDraws } : { seed: seed ^ 0x31ca5e03 }) }, eventAudit: [], cardUsage: {}, careerRewards: [],
+    progressionV2: Boolean(options.progressionV2),
   };
+  initializeCaseAttempts(state);
+  return state.progressionV2 ? initializeRunRewards(state) : state;
 }
 
 export function previewCase03Action(state, actionId, options = {}) {
   if (actionId === 'C01') {
     if (!['core', 'full'].includes(options.scope)) throw new Error('請先選擇需求範圍');
     const coreToken = Math.max(1, 2 - level(state, 'C8'));
-    return { token: coreToken + (options.scope === 'full' ? 1 : 0), time: options.scope === 'full' ? 2 : 1, stress: 0 };
+    const preview = { token: coreToken + (options.scope === 'full' ? 1 : 0), time: options.scope === 'full' ? 2 : 1, stress: 0 };
+    return withAttemptPreview(state, preview, actionId, 'A', 40, (options.scope === 'core' ? 5 : -5) + level(state, 'C8') * 10);
   }
-  if (actionId === 'C02') return { token: Math.max(1, 2 - level(state, 'C7')), time: 1, stress: 0 };
+  if (actionId === 'C02') return withAttemptPreview(state, { token: Math.max(1, 2 - level(state, 'C7')), time: 1, stress: 0 }, actionId, 'A', 40, (options.policy === 'explicit' ? 5 : 0) + level(state, 'C7') * 10);
   if (actionId === 'C03') {
     const strategy = STRATEGIES[options.strategy];
     if (!strategy) throw new Error('請先選擇分工方式');
-    return { token: strategy.token, time: strategy.time, stress: strategy.stress, predictedDebt: strategy.debt };
+    return withAttemptPreview(state, { token: strategy.token, time: strategy.time, stress: strategy.stress, predictedDebt: strategy.debt }, actionId, 'E', 40, strategy.bonus + level(state, 'C11') * 5);
   }
   if (actionId === 'C04') {
     if (!['strict', 'fast'].includes(options.mergeMode)) throw new Error('請先選擇合併方式');
     const c10 = level(state, 'C10');
-    return options.mergeMode === 'fast'
+    const preview = options.mergeMode === 'fast'
       ? { token: Math.max(1, 2 - (c10 >= 2 ? 1 : 0)), time: Math.max(1, 2 - (c10 ? 1 : 0)), stress: 1, addedDebt: 1 }
       : { token: 3, time: 2, stress: 0, addedDebt: 0 };
+    return withAttemptPreview(state, preview, actionId, 'E', 38, (options.mergeMode === 'strict' ? 10 : -5) + level(state, 'C10') * 5);
   }
   if (actionId === 'C05') {
     if (!['negotiate', 'accept'].includes(options.response)) throw new Error('請先決定如何回應客戶');
-    return { token: Math.max(1, 2 - (options.response === 'negotiate' ? level(state, 'C11') : 0)), time: 1, stress: Math.max(0, (options.response === 'accept' ? 2 : 1) - level(state, 'C8')) };
+    const preview = { token: Math.max(1, 2 - (options.response === 'negotiate' ? level(state, 'C11') : 0)), time: 1, stress: Math.max(0, (options.response === 'accept' ? 2 : 1) - level(state, 'C8')) };
+    return withAttemptPreview(state, preview, actionId, 'A', 38, (options.response === 'negotiate' ? 10 : -5) + level(state, 'C11') * 10);
   }
   if (actionId === 'C06') {
     if (!['focused', 'full'].includes(options.scope)) throw new Error('請先選擇測試範圍');
-    return { token: Math.max(1, (options.scope === 'full' ? 3 : 2) - (level(state, 'C9') >= 2 ? 1 : 0)), time: options.scope === 'full' ? 2 : 1, stress: 0, coverage: Math.min(4, (options.scope === 'full' ? 4 : 2) + (level(state, 'C9') ? 1 : 0)) };
+    const preview = { token: Math.max(1, (options.scope === 'full' ? 3 : 2) - (level(state, 'C9') >= 2 ? 1 : 0)), time: options.scope === 'full' ? 2 : 1, stress: 0, coverage: Math.min(4, (options.scope === 'full' ? 4 : 2) + (level(state, 'C9') ? 1 : 0)) };
+    return withAttemptPreview(state, preview, actionId, 'V', 35, (options.scope === 'full' ? 10 : 0) + level(state, 'C9') * 10 + level(state, 'C12') * 5);
   }
-  if (actionId === 'C08') return { token: Math.max(1, 3 - level(state, 'C12')), time: 2, stress: 0 };
+  if (actionId === 'C08') return withAttemptPreview(state, { token: Math.max(1, 3 - level(state, 'C12')), time: 2, stress: 0 }, actionId, 'E', 35, level(state, 'C12') * 10);
   if (actionId === 'C07') return { token: 0, time: 0, stress: 0 };
   throw new Error('未知工作');
 }
@@ -111,6 +154,7 @@ function blockers(state) {
 
 export function performCase03Action(original, actionId, raw = {}) {
   if (original.phase !== 'playing') throw new Error('案件已結束');
+  if (original.progressionV2 && original.pendingReward) throw new Error('請先處理目前的成長獎勵');
   if (typeof raw.operationId !== 'string' || !raw.operationId) throw new Error('缺少 operationId');
   const requestPayload = payload(actionId, raw);
   if (original.operationResults[raw.operationId]) {
@@ -128,8 +172,9 @@ export function performCase03Action(original, actionId, raw = {}) {
 
   if (actionId === 'C07' && raw.intent === 'limited' && !original.implementation?.complete) throw new Error('尚無可交付子集，不能有限試用');
   const state = clone(original);
+  state.lastAttempt = null;
   const cost = previewCase03Action(state, actionId, raw);
-  spend(state, cost);
+  const spendRefund = spend(state, cost);
   let result;
   if (actionId === 'C01') {
     const success = event(state, actionId, 'A', 40, (raw.scope === 'core' ? 5 : -5) + level(state, 'C8') * 10);
@@ -156,18 +201,22 @@ export function performCase03Action(original, actionId, raw = {}) {
     const strategy = STRATEGIES[raw.strategy];
     const success = event(state, actionId, 'E', 40, strategy.bonus + level(state, 'C11') * 5);
     state.implementation = { complete: true, strategy: raw.strategy, outcome: success ? 'aligned' : 'drifted' };
-    state.integrationDebt += strategy.debt + (success ? 0 : 1);
+    const debt = strategy.debt + (success ? 0 : 1);
+    const shielded = applyIntegrationShield(state, { cards: state.cards, equipped: state.equipped, debt });
+    Object.assign(state, shielded.state);
     state.artifactRevision += 1;
     milestone(state, 'implementation_complete');
-    createReward(state);
-    const rewardFallback = state.rewardFallback;
+    if (!state.progressionV2) createReward(state);
+    const rewardFallback = !state.progressionV2 ? state.rewardFallback : null;
     result = success
       ? process('設計稿與 API 第一次在同一個宇宙裡', `分工完成，公開合併債 ${state.integrationDebt}。`, '你選擇分工並交付同一份契約。', raw.strategy === 'solo' ? '你自己回覆自己，效率詭異地不錯。' : raw.strategy === 'pair' ? '設計師與工程師交換 review，不再用截圖當 API。' : '模擬 agent 產生接線草稿，NPC 逐項確認。', '下一步合併與 review。', 'agent 沒有替客戶決策；只處理已核准的工作。', 'implemented')
       : process('兩個按鈕叫同一個名字，API 卻回兩種時區', `功能可運行，但公開合併債升到 ${state.integrationDebt}。`, '你發出分工 brief。', 'NPC 找到規格漂移；模擬 agent 很有禮貌地複製了漂移。', '仍可合併 review，再付費修復。', '失敗留下可恢復狀態，不會假裝分工完成就等於整合完成。', 'drifted');
     if (rewardFallback) result.process.consequence += ` 卡片獎池已全滿，改領 ${rewardFallback.token} Token；stable reward ID 已記帳，不會重複領取。`;
   } else if (actionId === 'C04') {
     const success = event(state, actionId, 'E', 38, (raw.mergeMode === 'strict' ? 10 : -5) + level(state, 'C10') * 5);
-    state.integrationDebt += cost.addedDebt + (success ? 0 : 1);
+    const debt = cost.addedDebt + (success ? 0 : 1);
+    const shielded = applyIntegrationShield(state, { cards: state.cards, equipped: state.equipped, debt });
+    Object.assign(state, shielded.state);
     state.merge = { complete: true, mode: raw.mergeMode, reviewed: success };
     if (!state.integrationDebt) milestone(state, 'merge_reviewed'); else revoke(state, 'merge_reviewed');
     result = success
@@ -177,7 +226,9 @@ export function performCase03Action(original, actionId, raw = {}) {
     const success = event(state, actionId, 'A', 38, (raw.response === 'negotiate' ? 10 : -5) + level(state, 'C11') * 10);
     state.change = { announced: true, handled: success, response: raw.response };
     state.artifactRevision += 1;
-    state.evidence = { revision: null, coverage: 0, trace: false, failed: [] };
+    const evidence = applyMajorChangeEvidence({ ...state, evidence: { requirements: state.evidence.revision, contract: state.evidence.trace, tests: state.evidence.coverage, merge: state.merge?.reviewed } }, { cards: state.cards, equipped: state.equipped, directKeys: ['requirements', 'contract'], indirectKeys: ['tests', 'merge'] });
+    state.evidence = { revision: null, coverage: evidence.preserved.includes('tests') ? state.evidence.coverage : 0, trace: false, failed: [] };
+    reviseCaseAttempts(state, { revision: `artifact-r${state.artifactRevision}`, kind: success ? 'minor' : 'major', affectedKeys: ['C03', 'C04', 'C06', 'C08'] });
     if (success) milestone(state, 'change_contracted'); else { revoke(state, 'change_contracted'); state.integrationDebt += 1; }
     result = success
       ? process('「只改上限」被翻譯成一張可估的變更單', '客戶確認影響範圍；舊證據因 revision 改變而失效。', '你列出對 UI、API 與測試的影響。', '客戶選擇代價，NPC 更新契約。', '必須重跑目前 revision 的測試與追溯。', '沒有沿用舊綠燈冒充新證據。', 'contracted')
@@ -216,26 +267,70 @@ export function performCase03Action(original, actionId, raw = {}) {
     };
     const [baseId, title, text] = endings[raw.intent];
     state.phase = 'ended'; state.ending = { baseId, title, text };
+    state.ending.playFacets = composeEndingFacets(state);
     result = { title, summary: text, ending: clone(state.ending), outcome: baseId };
   }
+  if (state.lastAttempt) {
+    const attempt = state.lastAttempt;
+    const failureLines = {
+      'three-later': '續篇事件：三個「之後再說」排成待辦，前次決策題讓其中一個終於有名字。',
+      'owner-vacuum': '事件：取消權責在客戶、設計師與工程師之間表演量子疊加。',
+      'thumbs-up-contract': '事件：客戶回了一個讚，但讚沒有時區欄位。',
+      'timezone-emoji': '事件：契約裡的時區被寫成太陽 emoji，工程師拒絕猜經緯度。',
+      'payload-drift': '事件：設計稿叫 reservationId，API 叫 booking_no，兩邊都說自己比較直覺。',
+      'button-twins': '事件：兩顆按鈕同名，按下後各自前往不同宇宙。',
+      'cancel-note-conflict': '事件：cancellationReason 與 cancel_note 在 merge 現場互不相認。',
+      'review-tourist': '事件：review 清單來過、拍照、沒有留下任何核准紀錄。',
+      'decision-elevator': '事件：客戶決策還在搭電梯，變更已經先到 production 樓層。',
+      'limit-sidequest': '事件：借用上限順手帶來通知、權限與時區三個支線任務。',
+      'dst-runner': '事件：測試 runner 在夏令時間那天請假。',
+      'trace-gap': '事件：UI 截圖有了，API revision 卻沒有留下地址。',
+      'field-nickname': '續篇事件：剛修完欄位名稱，另一個 NPC 給它取了暱稱。',
+      'repair-rebase': '事件：修復分支在最後一刻遇上 rebase，債務改穿另一件外套。',
+    };
+    result.attempt = { outcome: attempt.outcome, chance: attempt.chance, learning: attempt.learning, modifiers: attempt.modifiers, failureEvent: attempt.failureEvent, sequel: attempt.sequel, retry: attempt.retry, retryLearningGain: attempt.retryLearningGain, cardTrigger: attempt.cardTrigger };
+    if (attempt.outcome === 'partial') {
+      result.title = `有條件通過：${result.title}`;
+      result.outcome = `${result.outcome ?? actionId.toLowerCase()}-partial`;
+      result.process.consequence += ' 本次是部分成功：流程可前進，但新增 1 點公開整合債。';
+      state.integrationDebt += 1;
+    } else if (attempt.failureEvent) {
+      result.process.response += ` ${failureLines[attempt.failureEvent] ?? '事件留下可付費補救的公開缺口。'}`;
+      if (attempt.sequel > 1) result.process.followUp += ` 這是第 ${attempt.sequel} 次續篇；理解進度已承接，剛出現的事件權重則降低。`;
+    }
+  }
+  if (spendRefund && result.process) result.process.consequence += ` Token 反芻胃返還 ${spendRefund} Token（本局次數有上限）。`;
+  recordMeaningfulAttempt(state, actionId);
   state.stateVersion += 1;
   state.operationPayloads[raw.operationId] = requestPayload;
   state.operationResults[raw.operationId] = clone(result);
-  state.log.push({ actionId, outcome: result.outcome, artifactRevision: state.artifactRevision });
+  state.log.push({
+    actionId,
+    options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))),
+    outcome: result.outcome,
+    artifactRevision: state.artifactRevision,
+    resources: { token: state.token, stress: state.stress, time: state.timeLeft },
+  });
   return { state, result, cached: false };
 }
 
 export function chooseCase03Reward(original, cardId) {
-  if (!original.pendingReward?.choices.includes(cardId)) throw new Error('這張卡不在目前獎勵');
-  if ((original.cards[cardId] ?? 0) >= CARDS[cardId].maxLevel) throw new Error('滿級卡不會進入獎池');
   const state = clone(original);
+  if (!state.progressionV2) {
+    if (!state.pendingReward?.choices.includes(cardId)) throw new Error('這張卡不在目前獎勵');
+    const previousLevel = state.cards[cardId] ?? 0;
+    state.cards[cardId] = Math.min(2, previousLevel + 1);
+    let disposition = previousLevel ? 'fused' : 'collected';
+    if (!state.equipped.includes(cardId) && state.equipped.length < 3) { state.equipped.push(cardId); disposition = previousLevel ? 'fused' : 'equipped'; }
+    state.pendingReward = null; state.rewardClaims.push('reward:handoff-kit');
+    return { state, reward: { kind: 'card', cardId, previousLevel, level: state.cards[cardId], disposition } };
+  }
   const previousLevel = state.cards[cardId] ?? 0;
-  state.cards[cardId] = Math.min(2, previousLevel + 1);
-  let disposition = previousLevel ? 'fused' : 'collected';
-  if (!state.equipped.includes(cardId) && state.equipped.length < 3) { state.equipped.push(cardId); disposition = previousLevel ? 'fused' : 'equipped'; }
-  state.pendingReward = null;
-  state.rewardClaims.push('reward:handoff-kit');
-  return { state, reward: { cardId, previousLevel, level: state.cards[cardId], disposition } };
+  const output = choosePendingRunReward(state, cardId);
+  const reward = output.reward.kind === 'card'
+    ? { ...output.reward, cardId: output.reward.cardId, previousLevel, level: state.cards[output.reward.cardId], disposition: previousLevel ? 'fused' : 'collected' }
+    : { ...output.reward, cardId: null, previousLevel: 0, level: 0, disposition: output.reward.kind };
+  return { state, reward, repeated: output.repeated };
 }
 
 export function case03PublicView(state) {
@@ -244,6 +339,6 @@ export function case03PublicView(state) {
     requirements: clone(state.requirements), contract: clone(state.contract), implementation: clone(state.implementation), merge: clone(state.merge), change: clone(state.change),
     artifactRevision: state.artifactRevision, integrationDebt: state.integrationDebt, evidence: clone(state.evidence), blockers: blockers(state), verifiedReady: blockers(state).length === 0,
     cards: Object.entries(state.cards).map(([id, cardLevel]) => ({ id, name: CARDS[id].name, level: cardLevel, equipped: state.equipped.includes(id) })),
-    pendingReward: clone(state.pendingReward), rewardFallback: clone(state.rewardFallback), ending: clone(state.ending),
+    pendingReward: clone(state.pendingReward), rewardFallback: clone(state.rewardFallback), progression: state.progression ? { runExp: state.progression.runExp, progressKeys: [...state.progression.progressKeys], rewardMilestones: state.progression.rewardMilestones.map((item) => ({ slot: item.slot, status: item.status })) } : null, ending: clone(state.ending),
   };
 }

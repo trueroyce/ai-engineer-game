@@ -1,6 +1,8 @@
-import { loadCareer, saveCareer, settleCase } from '../career/state.js';
+import { loadCareer, reserveRun, saveActiveRun, saveCareer, settleCase } from '../career/state-v2.js';
+import { buildCareerCaseRunRecord } from '../postgame/career-run-export.js';
+import { createCoachSession } from '../postgame/coach-ui.js';
 import { chooseCase03Reward, createCase03Game, performCase03Action } from './engine.js';
-import { renderCase03Board, renderCase03Ending, renderCase03Error, renderCase03Intro, renderCase03Preview, renderCase03Result, renderCase03Reward } from './render.js';
+import { renderCase03Board, renderCase03Ending, renderCase03Error, renderCase03Intro, renderCase03Preview, renderCase03Result, renderCase03Reward } from './render-v2.js';
 
 const root = document.querySelector('#app');
 const load = new URL(location.href).searchParams.get('mode') === 'career' ? loadCareer() : { status: 'invalid', reason: '案件 03 必須從接案大廳開始' };
@@ -13,6 +15,25 @@ let result = null;
 let message = '';
 let sequence = 0;
 let settlement = null;
+const coach = createCoachSession({
+  buildRecord: buildCareerCaseRunRecord,
+  getState: () => state,
+  onChange: () => render(),
+});
+
+if (career?.activeRun?.caseId === 'case-03') {
+  state = { ...structuredClone(career.activeRun.state), runId: career.activeRun.runId };
+  sequence = Object.keys(state.operationResults ?? {}).length;
+  screen = state.phase === 'ended' ? 'ending' : state.pendingReward ? 'reward' : 'board';
+} else if (career?.activeRun) {
+  screen = 'error';
+  load.reason = `已有 ${career.activeRun.caseId} 進行中的案件；請先回到該案件。`;
+}
+
+function persistActive() {
+  if (!state?.runId || state.phase === 'ended') return;
+  career = saveCareer(saveActiveRun(career, state.runId, state));
+}
 
 function render() {
   if (screen === 'error') root.innerHTML = renderCase03Error(load.reason ?? '職涯存檔不可用');
@@ -22,14 +43,22 @@ function render() {
   else if (screen === 'reward') root.innerHTML = renderCase03Reward(state);
   else if (screen === 'ending') {
     if (!settlement) { settlement = settleCase(career, state); career = saveCareer(settlement.career); }
-    root.innerHTML = renderCase03Ending(state, settlement);
+    root.innerHTML = renderCase03Ending(state, settlement, coach.view);
   } else root.innerHTML = renderCase03Board(state, message);
   root.querySelector('[tabindex="-1"]')?.focus({ preventScroll: true });
 }
 
-root.addEventListener('click', (event) => {
+root.addEventListener('click', async (event) => {
+  if (event.target.closest('[data-analyze-run]')) { await coach.analyze(false); return; }
+  if (event.target.closest('[data-reanalyze-run]')) { await coach.analyze(true); return; }
+  if (event.target.closest('[data-cancel-analysis]')) { await coach.cancel(); return; }
+  if (event.target.closest('[data-save-run]')) { await coach.save(); return; }
   if (event.target.closest('[data-start-case]')) {
-    state = createCase03Game({ templateId: career.templateId, cards: career.cards, equipped: career.equipped, rewardLedger: career.rewardLedger });
+    const initialState = createCase03Game({ templateId: career.templateId, cards: career.cards, equipped: career.loadoutsByCase['case-03'], rewardLedger: career.rewardLedger, progressionV2: true });
+    const reserved = reserveRun(career, { caseId: 'case-03', rulesVersion: initialState.ruleVersion, initialState });
+    career = reserved.career;
+    state = { ...initialState, runId: reserved.activeRun.runId };
+    career = saveCareer(saveActiveRun(career, state.runId, state));
     screen = 'board'; render(); return;
   }
   const action = event.target.closest('[data-case03-action]');
@@ -38,14 +67,14 @@ root.addEventListener('click', (event) => {
   if (event.target.closest('[data-case03-confirm]')) {
     try {
       const output = performCase03Action(state, actionId, { ...options, operationId: `case03-ui-${++sequence}`, stateVersion: state.stateVersion });
-      state = output.state; result = output.result; message = ''; screen = state.phase === 'ended' ? 'ending' : 'result';
+      state = output.state; persistActive(); result = output.result; message = ''; screen = state.phase === 'ended' ? 'ending' : 'result';
     } catch (error) { message = error.message; screen = 'board'; }
     render(); return;
   }
   if (event.target.closest('[data-case03-continue]')) { screen = state.pendingReward ? 'reward' : 'board'; render(); return; }
   const reward = event.target.closest('[data-case03-reward]');
   if (reward) {
-    try { const output = chooseCase03Reward(state, reward.dataset.case03Reward); state = output.state; message = `${output.reward.cardId} 已${output.reward.disposition === 'fused' ? '融合' : '收藏'}；啟用上限仍為三張。`; }
+    try { const output = chooseCase03Reward(state, reward.dataset.case03Reward); state = output.state; persistActive(); message = output.reward.kind === 'card' ? `${output.reward.cardId} 已${output.reward.disposition === 'fused' ? '融合' : '收藏'}；啟用上限仍為三張。` : `${output.reward.title} 已存入職涯，結算時才會永久套用。`; }
     catch (error) { message = error.message; }
     screen = 'board'; render();
   }
@@ -58,5 +87,6 @@ root.addEventListener('change', (event) => {
 
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && screen === 'preview') { screen = 'board'; actionId = null; options = {}; render(); } });
 window.addEventListener('beforeunload', (event) => { if (state?.phase === 'playing') { event.preventDefault(); event.returnValue = ''; } });
-window.__AIEG_CASE03_TEST__ = { get state() { return state ? structuredClone(state) : null; }, setState(next) { state = structuredClone(next); screen = state.phase === 'ended' ? 'ending' : state.pendingReward ? 'reward' : 'board'; settlement = null; render(); }, get screen() { return screen; } };
+window.__AIEG_CASE03_TEST__ = { get state() { return state ? structuredClone(state) : null; }, setState(next) { state = structuredClone(next); screen = state.phase === 'ended' ? 'ending' : state.pendingReward ? 'reward' : 'board'; settlement = null; render(); }, get screen() { return screen; }, exportRunRecord() { return state ? buildCareerCaseRunRecord(state) : null; } };
 render();
+coach.discover();

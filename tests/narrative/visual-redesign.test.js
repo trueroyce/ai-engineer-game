@@ -8,11 +8,11 @@ import { CARDS, TEMPLATES } from '../../src/narrative/rules.js';
 import { cardIllustration, characterPortrait, eventTone } from '../../src/narrative-ui/art.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from '../../src/narrative-ui/render.js';
 
-test('all six characters and all twelve cards have original inline vector identities', () => {
+test('all six characters and all eighteen cards have original inline vector identities', () => {
   const portraits = Object.keys(TEMPLATES).map(characterPortrait);
   const cards = Object.keys(CARDS).map((id) => cardIllustration(id, 1));
   assert.equal(new Set(portraits).size, 6);
-  assert.equal(new Set(cards).size, 12);
+  assert.equal(new Set(cards).size, 18);
   portraits.forEach((html) => assert.match(html, /^<svg[^>]+aria-hidden="true"/));
   cards.forEach((html) => assert.match(html, /^<svg[^>]+aria-hidden="true"/));
   assert.doesNotMatch(portraits.join('') + cards.join(''), /<image|data:image|<text/i);

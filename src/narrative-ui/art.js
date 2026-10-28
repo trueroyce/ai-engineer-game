@@ -48,6 +48,12 @@ const cardGlyphs = Object.freeze({
   C10: '<path class="ink paper-fill" d="M57 82h178v55H57z"/><circle class="ink accent-fill" cx="94" cy="109" r="18"/><circle class="ink paper-fill" cx="146" cy="109" r="18"/><circle class="ink paper-fill" cx="198" cy="109" r="18"/><path class="ink" d="M78 45h136M146 45v37M126 45l20-18 20 18"/>',
   C11: '<path class="ink paper-fill" d="M50 52h103v72H91l-26 22 7-22H50z"/><path class="ink accent-fill" d="M151 76h96v67h-28l8 22-29-22h-47z"/><path class="thin" d="M70 73h61M70 91h42M171 96h55M171 114h38"/>',
   C12: '<path class="ink paper-fill" d="M64 39h139v129H64z"/><path class="ink accent-fill" d="M104 27h59v28h-59z"/><path class="ink" d="M85 78l9 9 16-19M85 108l9 9 16-19M85 138l9 9 16-19M122 79h61M122 109h61M122 139h61"/>',
+  C13: '<path class="ink paper-fill" d="M52 52h98v102H52z"/><path class="ink accent-fill" d="M169 69q40-32 69 4t-7 66q-31 26-68-8"/><path class="ink" d="M72 74h58M72 94h42M72 114h50M187 91q15-17 31 0M199 109q9 8 18 0"/>',
+  C14: '<path class="ink paper-fill" d="M63 61h171v91H63z"/><path class="ink accent-fill" d="M83 80h131v53H83z"/><path class="ink" d="M112 53v107M183 53v107M54 106h189M130 91l18-18 18 18-18 18z"/>',
+  C15: '<path class="ink paper-fill" d="M51 62h75v91H51zM183 62h75v91h-75z"/><path class="ink accent-fill" d="M126 84h57v47h-57z"/><path class="ink" d="M72 91h33M72 109h33M204 91h33M204 109h33M141 107h27"/>',
+  C16: '<ellipse class="ink accent-fill" cx="105" cy="143" rx="51" ry="16"/><path class="ink accent-fill" d="M54 78v65q0 16 51 16t51-16V78"/><ellipse class="ink paper-fill" cx="105" cy="78" rx="51" ry="16"/><path class="ink paper-fill" d="M186 49h54v92h-54z"/><path class="ink" d="M198 70h30M198 89h22M198 108h30M84 79l21 18 23-18"/>',
+  C17: '<path class="ink paper-fill" d="M54 44h101v118H54zM169 61h91v101h-91z"/><path class="ink" d="M73 66h62M73 86h45M73 106h59M188 83h53M188 103h38M188 123h49"/><path class="ink accent-fill" d="M137 129l32-24v20h31v17h-31v20z"/>',
+  C18: '<circle class="ink paper-fill" cx="147" cy="105" r="67"/><circle class="ink accent-fill" cx="147" cy="105" r="42"/><circle class="ink paper-fill" cx="147" cy="105" r="17"/><path class="ink" d="M147 25v31M147 154v31M67 105h31M196 105h31M147 105l48-42"/><path class="ink accent-fill" d="M190 54l27-7-7 27z"/>',
 });
 
 export function cardIllustration(cardId, level = 1) {
@@ -138,6 +144,7 @@ export function endingIllustration(baseId, facets = []) {
   };
   const extras = [
     facets.includes('token-rich') || facets.includes('token-gravekeeper') ? '<g class="coin-stack"><ellipse class="star-fill ink" cx="268" cy="151" rx="24" ry="8"/><path class="star-fill ink" d="M244 130v21q0 8 24 8t24-8v-21"/><ellipse class="star-fill ink" cx="268" cy="130" rx="24" ry="8"/></g>' : '',
+    facets.includes('on-time') ? '<g class="deadline-clock"><circle class="paper-fill ink" cx="55" cy="142" r="27"/><path class="ink" d="M55 122v21l14 9M43 108h24"/></g>' : '',
     facets.includes('high-stress') ? '<path class="danger-line" d="M48 112q-24-18 0-36t0-36"/>' : '',
     facets.includes('recovered') ? '<path class="paper-fill ink" d="M33 39l39-11 9 31-39 11zM43 45l28-8M53 36l8 27"/>' : '',
   ].join('');

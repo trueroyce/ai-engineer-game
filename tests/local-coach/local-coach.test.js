@@ -10,7 +10,7 @@ import { startServer } from '../../scripts/serve.mjs';
 import { createRunWriter } from '../../src/local-coach/run-writer.js';
 import { createRunStore } from '../../src/mcp/run-store.js';
 import { RUN_LIMITS } from '../../src/postgame/run-schema.js';
-import { syntheticRun } from '../mcp/fixtures.js';
+import { syntheticCase02Run, syntheticCase03Run, syntheticRun } from '../mcp/fixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -168,6 +168,16 @@ test('real loopback HTTP bridge enforces host, origin, CSRF, method, type, size,
   assert.equal(cancelled.status, 202);
   assert.deepEqual(analysisCalls[2], { type: 'cancel', runId: record.runId });
   assert.equal((await request(port, '/api/local-coach/cancel', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: record.runId, signal: 'all' }) })).status, 400);
+
+  for (const extra of [syntheticCase02Run(), syntheticCase03Run()]) {
+    const extraSaved = await request(port, '/api/local-coach/runs', { method: 'POST', headers: goodHeaders, body: JSON.stringify(extra) });
+    assert.equal(extraSaved.status, 201);
+    assert.deepEqual(await createRunStore(runs).get(extra.runId), extra);
+    const extraAnalyzed = await request(port, '/api/local-coach/analyze', { method: 'POST', headers: goodHeaders, body: JSON.stringify({ runId: extra.runId }) });
+    assert.equal(extraAnalyzed.status, 200);
+    assert.equal(extraAnalyzed.json.runId, extra.runId);
+  }
+  assert.deepEqual(analysisCalls.slice(3).map((item) => item.runId), [syntheticCase02Run().runId, syntheticCase03Run().runId]);
 
   const withPath = { ...record, path: 'C:\\outside.json', command: 'calc.exe' };
   assert.equal((await request(port, '/api/local-coach/runs', { method: 'POST', headers: goodHeaders, body: JSON.stringify(withPath) })).status, 400);

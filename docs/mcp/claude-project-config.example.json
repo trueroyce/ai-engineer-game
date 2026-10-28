@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ai-engineer-postgame-coach": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "scripts/mcp-postgame-coach.mjs"
+      ]
+    }
+  }
+}

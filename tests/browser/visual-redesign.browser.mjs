@@ -149,8 +149,8 @@ async function main() {
     endingState.ending = composeEnding(endingState, 'E01');
     await page.eval(`window.__AIEG_NARRATIVE_TEST__.setState(${JSON.stringify(endingState)})`);
     await page.waitFor('document.querySelector(".ending-tableau")');
-    const ending = await page.eval(`({ tier: document.querySelector('.ending-stamp strong')?.textContent, art: document.querySelector('.ending-illustration')?.className.baseVal, facets: document.querySelector('.ending-copy')?.textContent })`);
-    check('結局以主要交付層級為主、狀態尾聲為次', ending.tier === '正式交付' && ending.art.includes('ending-formal') && ending.facets.includes('狀態尾聲：'), JSON.stringify(ending));
+    const ending = await page.eval(`({ tier: document.querySelector('.ending-stamp strong')?.textContent, art: document.querySelector('.ending-illustration')?.className.baseVal, badges: document.querySelectorAll('.ending-badge').length, rules: document.querySelector('.ending-rules')?.tagName })`);
+    check('結局以主要交付層級為主、特色稱號醒目且規則可收合', ending.tier === '正式交付' && ending.art.includes('ending-formal') && ending.badges >= 1 && ending.rules === 'DETAILS', JSON.stringify(ending));
     await viewportAudit(page, '1280px 結局');
     await shot(page, '09-ending-1280');
 

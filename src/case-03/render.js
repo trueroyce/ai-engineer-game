@@ -1,9 +1,10 @@
-import { CARDS, TEMPLATES } from '../narrative/rules.js';
+import { TEMPLATES } from '../narrative/rules.js';
+import { CARDS } from '../career/cards.js';
 import { CASE03_ACTIONS, STRATEGIES } from './rules.js';
 import { case03PublicView, previewCase03Action } from './engine.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
-const shell = (body) => `<div class="topbar"><span class="brand">AI 工程接案遊戲 · CASE 03</span><a class="button secondary" href="./index.html">返回接案大廳</a></div>${body}`;
+const shell = (body) => `<div class="topbar"><span class="brand">AI 工程接案遊戲 · CASE 03</span><a class="button secondary" href="./index.html" aria-label="返回接案大廳">返回接案大廳</a></div>${body}`;
 const icon = () => '<svg class="comic-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="12" width="48" height="40" rx="7"/><path d="M8 24h48M20 7v11M44 7v11M19 34h10M35 34h10M19 43h10"/></svg>';
 
 function hud(view) {
@@ -16,7 +17,8 @@ export function renderCase03Error(reason) {
 
 export function renderCase03Intro(career) {
   const template = TEMPLATES[career.templateId];
-  const equipped = career.equipped.length ? career.equipped.map((id) => `<span class="tag">${esc(CARDS[id].name)} Lv.${career.cards[id]}</span>`).join('') : '<span class="tag">沒有裝備卡也能開局</span>';
+  const loadout = career.loadoutsByCase?.['case-03'] ?? career.equipped ?? [];
+  const equipped = loadout.length ? loadout.map((id) => `<span class="tag">${esc(CARDS[id].name)} Lv.${career.cards[id]}</span>`).join('') : '<span class="tag">沒有裝備卡也能開局</span>';
   return shell(`<section class="hero">${icon()}<div class="eyebrow">進階案件 · NPC 協作</div><h1>大家都說<br>只改一點點</h1><p class="lede">做一套預約／借用管理：客戶負責決策，設計師負責狀態，工程師負責 API，你負責讓三個人不要在同一張截圖裡講三種規格。</p><p class="notice">NPC、sub-agent、review、merge 與測試都是遊戲模擬；不會連線多人、啟動 CLI 或呼叫模型。</p><div class="owned"><strong>${esc(template.name)} · 需求 ${template.attrs.A}／工程 ${template.attrs.E}／驗證 ${template.attrs.V}</strong><div>${equipped}</div></div><div class="actions"><button class="primary" data-start-case>打開排程表，開始案件</button></div></section><section><h2>合作角色</h2><div class="source-grid"><article class="source-card"><span class="eyebrow">NPC 客戶</span><h3>決策擁有者</h3><p>決定取消、時區、借用上限；agent 不能代簽。</p></article><article class="source-card"><span class="eyebrow">NPC 設計師</span><h3>介面與狀態</h3><p>確認空狀態、衝突與錯誤訊息。</p></article><article class="source-card"><span class="eyebrow">NPC 工程師</span><h3>API 與合併</h3><p>維護 payload、review 與回歸證據。</p></article></div></section>`);
 }
 
@@ -62,25 +64,31 @@ export function renderCase03Preview(state, actionId, options) {
   const view = case03PublicView(state);
   let preview = null;
   try { preview = previewCase03Action(state, actionId, options); } catch { /* explicit choice pending */ }
-  return shell(`${hud(view)}<section class="panel preview" tabindex="-1"><div class="eyebrow">確認工作 · 沒有預選答案</div><h1>${esc(CASE03_ACTIONS[actionId].title)}</h1><p>${esc(CASE03_ACTIONS[actionId].tutorial)}</p><div class="receipt"><div><span>Token</span><strong>${preview ? `-${preview.token}` : '待選'}</strong></div><div><span>時間</span><strong>${preview ? `-${preview.time}` : '待選'}</strong></div><div><span>壓力</span><strong>${preview ? `+${preview.stress}` : '待選'}</strong></div><div><span>事件</span><strong>能力＋卡片＋新樣本</strong></div></div>${controls(state, actionId, options, view)}<p class="notice">公開選項會改變成本與事件條件；不顯示隱藏骰值，也不偷偷推薦正解。</p><details><summary>折疊教學：這次會模擬什麼？</summary><p>只模擬客戶、設計師、工程師與 agent 的協作過程。它不會啟動真工具、真 CLI 或網路服務。</p></details><div class="actions sticky"><button class="secondary" data-case03-cancel>取消，不扣資源</button><button class="primary" data-case03-confirm ${complete(actionId, options) ? '' : 'disabled'}>確認執行</button></div></section>`);
+  const probability = preview?.attempt ? `<p class="notice good">目前公開成功機率 ${preview.attempt.chance}%；累積理解 ${preview.attempt.learning}${preview.attempt.retry ? `；本次重試理解 +${preview.attempt.retryLearningGain}` : ''}。失敗後才抽情境事件。</p>` : '';
+  return shell(`${hud(view)}<section class="panel preview" tabindex="-1"><div class="eyebrow">確認工作 · 沒有預選答案</div><h1>${esc(CASE03_ACTIONS[actionId].title)}</h1><p>${esc(CASE03_ACTIONS[actionId].tutorial)}</p><div class="receipt"><div><span>Token</span><strong>${preview ? `-${preview.token}` : '待選'}</strong></div><div><span>時間</span><strong>${preview ? `-${preview.time}` : '待選'}</strong></div><div><span>壓力</span><strong>${preview ? `+${preview.stress}` : '待選'}</strong></div><div><span>事件</span><strong>能力＋卡片＋新樣本</strong></div></div>${controls(state, actionId, options, view)}${probability}<p class="notice">公開選項會改變成本與事件條件；不顯示隱藏骰值，也不偷偷推薦正解。</p><details><summary>折疊教學：這次會模擬什麼？</summary><p>只模擬客戶、設計師、工程師與 agent 的協作過程。它不會啟動真工具、真 CLI 或網路服務。</p></details><div class="actions sticky"><button class="secondary" data-case03-cancel>取消，不扣資源</button><button class="primary" data-case03-confirm ${complete(actionId, options) ? '' : 'disabled'}>確認執行</button></div></section>`);
 }
 
 export function renderCase03Result(state, result) {
   const view = case03PublicView(state);
   const beats = result.process ? Object.values(result.process) : [];
-  return shell(`${hud(view)}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">協作事件結果</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case03-continue>${state.pendingReward ? '處理中段卡片獎勵' : '回工作板'}</button></div></section>`);
+  const outcomeLabels = { success: '成功', partial: '部分成功', failure: '未成功' };
+  const attempt = result.attempt ? `<p class="notice">本次公開機率 ${result.attempt.chance}% · 結果 ${outcomeLabels[result.attempt.outcome] ?? '已處理'}${result.attempt.retry ? ` · 重試理解 +${result.attempt.retryLearningGain}` : ''}${result.attempt.sequel > 1 ? ` · 事件續篇 ${result.attempt.sequel}` : ''}</p>` : '';
+  return shell(`${hud(view)}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">協作事件結果</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${attempt}${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case03-continue>${state.pendingReward ? '處理本局成長獎勵' : '回工作板'}</button></div></section>`);
 }
 
 export function renderCase03Reward(state) {
   const view = case03PublicView(state);
   const cards = view.pendingReward.choices.map((id) => {
+    const option = view.pendingReward.options?.find((item) => item.id === id || item.cardId === id);
+    if (option && option.kind !== 'card') return `<button class="reward-card" data-case03-reward="${esc(id)}"><span class="eyebrow">永久職涯替代獎勵</span><h3>${esc(option.title)}</h3><p>${esc(option.description)}</p></button>`;
     const old = state.cards[id] ?? 0;
     const mode = old ? `融合 Lv.${old} → Lv.${old + 1}` : state.equipped.length >= 3 ? '收藏，不強迫丟卡' : '收藏並自動啟用';
     return `<button class="reward-card" data-case03-reward="${id}"><span class="eyebrow">${esc(mode)}</span><h3>${esc(CARDS[id].name)}</h3><p>${esc(old ? CARDS[id].upgradeDescription : CARDS[id].description)}</p></button>`;
   }).join('');
-  return shell(`${hud(view)}<section class="panel reward-screen"><div class="eyebrow">中段交接工具獎勵</div><h1>收藏、融合，或留在卡庫</h1><p class="lede">最多仍只啟用三張；拿獎不需要先丟卡。領完後仍有 merge、變更、測試與交付玩法。</p><div class="reward-grid">${cards}</div></section>`);
+  return shell(`${hud(view)}<section class="panel reward-screen"><div class="eyebrow">本局成長 ${view.pendingReward.slot} / 2</div><h1>三選一：收藏、融合或永久替代</h1><p class="lede">每次合法遊玩可在第 2、4 個實質進度各領一次；同局刷新不重領，下一局仍可再次成長。</p><div class="reward-grid">${cards}</div></section>`);
 }
 
 export function renderCase03Ending(state, settlement) {
-  return shell(`<section class="ending"><div class="hero">${icon()}<div class="eyebrow">案件 03 結算 · ${esc(state.ending.baseId)}</div><h1>${esc(state.ending.title)}</h1><p class="lede">${esc(state.ending.text)}</p><p class="notice">本次新增 ${settlement.expGained} EXP；相同 milestone 與 reward 不重複領取。Token、壓力與時間不帶回大廳。</p><div class="actions"><a class="button primary" data-return-lobby href="./index.html">返回接案大廳</a></div></div></section>`);
+  const facets = state.ending.playFacets?.length ? `<div class="source-grid">${state.ending.playFacets.map((facet) => `<article class="source-card"><span class="eyebrow">本局稱號</span><h3>${esc(facet.title)}</h3><p>${esc(facet.text)}</p></article>`).join('')}</div>` : '';
+  return shell(`<section class="ending"><div class="hero">${icon()}<div class="eyebrow">案件 03 結算</div><h1>${esc(state.ending.title)}</h1><p class="lede">${esc(state.ending.text)}</p>${facets}<p class="notice">本次新增 ${settlement.expGained} EXP；同一局的里程碑與獎勵不會因刷新重領，合法重玩則會建立新 run。Token、壓力與時間不帶回大廳。</p><div class="actions"><a class="button primary" data-return-lobby href="./index.html">返回接案大廳</a></div></div></section>`);
 }

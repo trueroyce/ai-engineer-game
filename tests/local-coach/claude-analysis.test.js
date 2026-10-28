@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { buildClaudeInvocation, createClaudeAnalysisService } from '../../src/local-coach/claude-analysis.js';
 import { createRunWriter } from '../../src/local-coach/run-writer.js';
-import { syntheticRun } from '../mcp/fixtures.js';
+import { syntheticCase02Run, syntheticCase03Run, syntheticRun } from '../mcp/fixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const FAKE = path.join(ROOT, 'tests', 'local-coach', 'fake-claude.mjs');
@@ -89,6 +89,21 @@ test('successful analysis uses stdin, returns structured data, and same-run retr
   const fresh = await analyzer.analyze(record.runId, { reanalyze: true });
   assert.equal(fresh.reused, false);
   assert.equal(calls.length, 2);
+});
+
+test('the same fixed three-tool stub analysis accepts case 02 and case 03 records', async (t) => {
+  const runs = await fs.mkdtemp(path.join(os.tmpdir(), 'aieg-analysis-three-case-'));
+  t.after(() => fs.rm(runs, { recursive: true, force: true }));
+  const records = [syntheticCase02Run(), syntheticCase03Run()];
+  const writer = createRunWriter(runs);
+  for (const record of records) await writer.save(record);
+  for (const record of records) {
+    const calls = [];
+    const result = await service({ runs, calls }).analyze(record.runId);
+    assert.equal(result.runId, record.runId);
+    assert.equal(result.critique.headline, '合成局講評');
+    assert.equal(calls.length, 1);
+  }
 });
 
 test('invalid and path-shaped run IDs never spawn a process', async (t) => {

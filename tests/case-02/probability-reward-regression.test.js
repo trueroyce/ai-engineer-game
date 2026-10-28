@@ -124,7 +124,7 @@ test('全獎池滿級時明示轉為有界 Token 補償並記帳，不出現空�
   assert.equal(state.token, before - previewCase02Action({ ...state, token: before }, 'B03', { useFastMerge: false }).token + 2);
 });
 
-test('C7-C12 在案件 02 都有實際、可見且有界的作用；原案件 01 抽池仍只有 C1-C6', () => {
+test('C7-C12 在案件 02 都有實際作用；案件 01 抽池加入三張可實際生效的通用超頻卡', () => {
   const plain = createCase02Game({ templateId: 'balanced', eventRolls: [1] });
   const c7 = createCase02Game({ templateId: 'balanced', cards: { C7: 2 }, equipped: ['C7'], eventRolls: [1] });
   assert.ok(previewCase02Action(c7, 'B01').token < previewCase02Action(plain, 'B01').token);
@@ -144,7 +144,7 @@ test('C7-C12 在案件 02 都有實際、可見且有界的作用；原案件 01
   assert.ok(previewCase02Action(c11, 'B02', { strategy: 'one', useRapid: false }).briefScore > previewCase02Action(plain, 'B02', { strategy: 'one', useRapid: false }).briefScore);
   const c12 = createCase02Game({ templateId: 'balanced', cards: { C12: 2 }, equipped: ['C12'], eventRolls: [1] });
   assert.ok(previewCase02Action(c12, 'B07').token < previewCase02Action(plain, 'B07').token);
-  assert.deepEqual(CASE01_CARD_IDS, ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']);
+  assert.deepEqual(CASE01_CARD_IDS, ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C13', 'C14', 'C16']);
 });
 
 test('玩家公開 view 不洩漏 seed、骰流、門檻、骰值或 eventAudit', () => {

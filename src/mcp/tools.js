@@ -1,4 +1,6 @@
 import { LIMITS } from '../narrative/rules.js';
+import { CASE02_LIMITS } from '../case-02/rules.js';
+import { CASE03_LIMITS } from '../case-03/rules.js';
 import { RUN_LIMITS, RUN_SCHEMA_VERSION, SUPPORTED_GAME_RULE_VERSIONS } from '../postgame/run-schema.js';
 import { RunStoreError } from './run-store.js';
 
@@ -158,6 +160,11 @@ export function createToolService(store) {
               resources: { initialToken: LIMITS.token, tokenCap: LIMITS.tokenCap, stressCap: LIMITS.stressCap, deadline: LIMITS.deadline, hardWork: LIMITS.hardWork },
               cards: '開場三選一，約三分之一與三分之二進度各再三選一；同卡可融合。',
               ending: '主要交付層級由公開成果與證據決定；資源與歷程只改變尾聲。',
+            },
+            publicRulesByCase: {
+              'case-01': { focus: '需求、實作、驗證與證據', resources: { initialToken: LIMITS.token, tokenCap: LIMITS.tokenCap, stressCap: LIMITS.stressCap, deadline: LIMITS.deadline, hardWork: LIMITS.hardWork } },
+              'case-02': { focus: '三份 CSV 的資料契約、整合債務、跨源測試與來源追溯', resources: { initialToken: CASE02_LIMITS.token, tokenCap: CASE02_LIMITS.tokenCap, stressCap: CASE02_LIMITS.stressCap, deadline: CASE02_LIMITS.deadline } },
+              'case-03': { focus: '客戶決策、NPC 協作、介面契約、merge、變更與目前 revision 證據', resources: { initialToken: CASE03_LIMITS.token, tokenCap: CASE03_LIMITS.tokenCap, stressCap: CASE03_LIMITS.stressCap, deadline: CASE03_LIMITS.deadline } },
             },
             knowledgeBoundary: '不提供事件權重、隨機 seed、內部 function truth、未揭露缺陷或未發生分支。',
             analysisGuide: analysisGuide(),

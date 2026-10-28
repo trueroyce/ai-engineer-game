@@ -1,12 +1,62 @@
-import { case02CardLevel, previewCase02Action } from './engine-v2.js';
+import { case02CardLevel, case02PublicView, previewCase02Action } from './engine-v2.js';
 import * as legacy from './render.js';
+import { cardIllustration } from '../narrative-ui/art.js';
+import { renderLocalCoachPanel } from '../postgame/coach-ui.js';
+import { renderEndingStage } from '../presentation/ending-stage.js';
+import { case02ActionArt, case02EndingArt, case02StatusArt, case02Tone } from './art.js';
 
-export const renderCase02Board = legacy.renderCase02Board;
-export const renderCase02Ending = legacy.renderCase02Ending;
 export const renderCase02Error = legacy.renderCase02Error;
-export const renderCase02Intro = legacy.renderCase02Intro;
-export const renderCase02Result = legacy.renderCase02Result;
-export const renderCase02Reward = legacy.renderCase02Reward;
+
+const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+const shell = (content) => `<div class="topbar"><span class="brand">AI 工程接案遊戲 · CASE 02</span><a class="button secondary" href="./index.html">回到接案大廳</a></div>${content}`;
+
+export function renderCase02Intro(career) {
+  return legacy.renderCase02Intro(career).replace('<section class="hero">', `<section class="hero case-hero">${case02ActionArt('B03', 'good')}`);
+}
+
+export function renderCase02Board(state, message = '') {
+  let html = legacy.renderCase02Board(state, message);
+  html = html.replace('<section class="panel">', `<section class="panel case-workspace">${case02StatusArt(state)}`);
+  const actionIds = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09'];
+  let index = 0;
+  return html.replace(/<article class="action-card ([^"]*)"><div><span class="mark">/g, (match, classes) => {
+    const actionId = actionIds[index++] ?? 'B03';
+    return `<article class="action-card action-${actionId.toLowerCase()} ${classes}"><div>${case02ActionArt(actionId)}<span class="mark">`;
+  });
+}
+
+export function renderCase02Result(state, result) {
+  const actionId = state.log.at(-1)?.actionId ?? 'B03';
+  const tone = case02Tone(result);
+  return legacy.renderCase02Result(state, result)
+    .replace('<section class="panel result"', `<section class="panel result result-tone-${tone}"`)
+    .replace('<div class="eyebrow">', `<div class="result-scene">${case02ActionArt(actionId, tone)}</div><div class="eyebrow">`)
+    .replace('<b>1</b>', '<b>你</b><span class="beat-role">玩家 prompt</span>')
+    .replace('<b>2</b>', '<b>AI</b><span class="beat-role">agent / 資料回應</span>')
+    .replace('<b>3</b>', '<b>?</b><span class="beat-role">追問與整合</span>')
+    .replace('<b>4</b>', '<b>!</b><span class="beat-role">可見後果</span>');
+}
+
+export function renderCase02Reward(state) {
+  let html = legacy.renderCase02Reward(state);
+  for (const id of state.pendingReward?.choices ?? []) {
+    if (!/^C\d+$/.test(id)) continue;
+    html = html.replace(`<button class="reward-card" data-case02-reward="${id}">`, `<button class="reward-card" data-case02-reward="${id}">${cardIllustration(id, Math.min(2, (state.cards[id] ?? 0) + 1))}`);
+  }
+  return html;
+}
+
+export function renderCase02Ending(state, settlement, coachView = null) {
+  const ending = state.ending;
+  const labels = { 'C02-VERIFIED': '正式交付', 'C02-LIMITED': '有限試用', 'C02-FAILED': '風險交付', 'C02-STOP': '誠實止損' };
+  const blockersNow = case02PublicView(state).blockers;
+  const blockers = state.ending.baseId === 'C02-VERIFIED' ? '' : `<section class="ending-open-issues"><h2>結案時仍公開的限制</h2><ul>${blockersNow.map((item) => `<li>${esc(item)}</li>`).join('') || '<li>本局依選擇保留未完成風險。</li>'}</ul></section>`;
+  return shell(renderEndingStage({
+    caseLabel: '案件 02 結案', outcomeLabel: labels[ending.baseId] ?? '案件結案', title: ending.title, text: ending.text,
+    art: case02EndingArt(ending.baseId), facets: ending.playFacets ?? [], coach: renderLocalCoachPanel(coachView),
+    footer: `${blockers}<p class="notice">職涯增加 ${settlement?.expGained ?? 0} EXP；跨案卡庫與獎勵 ledger 已保存，短期資源回到大廳時重置。</p>`,
+  }));
+}
 
 function selectionComplete(actionId, options) {
   if (actionId === 'B01') return Boolean(options.idPolicy && options.datePolicy && options.duplicatePolicy);
@@ -41,6 +91,10 @@ export function renderCase02Preview(state, actionId, options) {
     html = html.replace('<details>', `${control}<details>`);
   }
   html = html.replace('<details>', '<p class="notice">結果由公開狀態、角色能力與裝備卡共同影響；不暗示隱藏正解，也不保證成功。</p><details>');
+  if (preview?.attempt) {
+    const retry = preview.attempt.retry ? `；本次重試理解 +${preview.attempt.retryLearningGain}` : '';
+    html = html.replace('<details>', `<p class="notice good">目前公開成功機率 ${preview.attempt.chance}%；累積理解 ${preview.attempt.learning}${retry}。失敗後才會抽情境事件。</p><details>`);
+  }
   const disabled = selectionComplete(actionId, options) ? '' : ' disabled';
   html = html.replace(/<button class="primary" data-case02-confirm\s*(?:disabled)?\s*>/, `<button class="primary" data-case02-confirm${disabled}>`);
   return html;
