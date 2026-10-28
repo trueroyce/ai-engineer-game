@@ -1,4 +1,6 @@
-import { CARDS, TEMPLATES } from '../narrative/rules.js';
+import { TEMPLATES } from '../narrative/rules.js';
+import { CARDS } from '../career/cards.js';
+import { choosePendingRunReward, grantRunProgress, initializeRunRewards } from '../career/run-rewards.js';
 import {
   CASE02_ACTIONS,
   CASE02_LIMITS,
@@ -22,7 +24,10 @@ function contractScore(contract) {
 }
 
 function addMilestone(state, id) {
-  if (!state.ledger.includes(id)) state.ledger.push(id);
+  if (!state.ledger.includes(id)) {
+    state.ledger.push(id);
+    if (state.progressionV2) grantRunProgress(state, id);
+  }
 }
 
 function touchData(state) {
@@ -51,6 +56,7 @@ function applyWorkCost(state, preview) {
 
 function publicBlockers(state) {
   const blockers = [];
+  if ((state.preIntegrationDebt ?? 0) > 0) blockers.push(`尚有 ${state.preIntegrationDebt} 點前期整合債`);
   if (state.contract && state.contract.clarity === false) blockers.push('契約仍有一句話各自解讀');
   if (contractScore(state.contract) < 3) blockers.push('資料契約仍有未對齊項目');
   if (!state.normalization?.complete) blockers.push('三份來源尚未完成正規化');
@@ -78,7 +84,7 @@ function result(title, summary, process, extra = {}) {
   return { type: 'event', title, summary, process, ...extra };
 }
 
-export function createCase02Game({ templateId, cards = {}, equipped = [], rewardLedger = [] } = {}) {
+export function createCase02Game({ templateId, cards = {}, equipped = [], rewardLedger = [], progressionV2 = false } = {}) {
   const template = TEMPLATES[templateId];
   if (!template) throw new Error('未知角色模板');
   const safeCards = {};
@@ -87,7 +93,7 @@ export function createCase02Game({ templateId, cards = {}, equipped = [], reward
     safeCards[id] = level;
   }
   const safeEquipped = [...new Set(equipped)].filter((id) => safeCards[id]).slice(0, 3);
-  return {
+  const state = {
     ruleVersion: CASE02_RULE_VERSION,
     caseId: 'case-02',
     phase: 'playing',
@@ -103,6 +109,7 @@ export function createCase02Game({ templateId, cards = {}, equipped = [], reward
     contract: null,
     normalization: null,
     integration: null,
+    preIntegrationDebt: 0,
     change: { announced: false, handled: false, contractUpdated: false },
     destructiveCleanup: false,
     dataRevision: 0,
@@ -115,7 +122,9 @@ export function createCase02Game({ templateId, cards = {}, equipped = [], reward
     log: [],
     operationResults: {},
     ending: null,
+    progressionV2,
   };
+  return progressionV2 ? initializeRunRewards(state) : state;
 }
 
 export function previewCase02Action(state, actionId, rawOptions = {}) {
@@ -216,12 +225,13 @@ export function performCase02Action(original, actionId, raw = {}) {
     const options = exactOptions(raw, ['operationId', 'stateVersion']);
     const preview = previewCase02Action(state, actionId, options);
     applyWorkCost(state, preview);
-    const unresolvedDebt = (3 - contractScore(state.contract)) + (state.normalization?.predictedDebt ?? 0);
+    const unresolvedDebt = (3 - contractScore(state.contract)) + (state.normalization?.predictedDebt ?? 0) + (state.preIntegrationDebt ?? 0);
     state.integration = { complete: true, unresolvedDebt, joinedRows: 12, total: unresolvedDebt ? 18420 : 17820 };
+    state.preIntegrationDebt = 0;
     state.change = { announced: true, handled: false, contractUpdated: false };
     touchData(state);
     if (unresolvedDebt === 0) addMilestone(state, 'truth_reconciled');
-    if (!state.rewardLedgerSnapshot.includes(CASE02_REWARD_ID) && !state.rewardClaims.includes('reward:integration-kit')) {
+    if (!state.progressionV2 && !state.rewardLedgerSnapshot.includes(CASE02_REWARD_ID) && !state.rewardClaims.includes('reward:integration-kit')) {
       state.pendingReward = { rewardId: CASE02_REWARD_ID, choices: [...CASE02_REWARD_CHOICES] };
     }
     out = result('單一真相產生了，旁邊還黏著幾張便利貼', `已合併 12 筆公開樣本；整合債 ${unresolvedDebt}。`, {
@@ -345,18 +355,23 @@ export function performCase02Action(original, actionId, raw = {}) {
 
 export function chooseCase02Reward(original, cardId) {
   const state = clone(original);
-  if (!state.pendingReward || !state.pendingReward.choices.includes(cardId)) throw new Error('這張卡不在目前獎勵中');
-  const previousLevel = state.cards[cardId] ?? 0;
-  state.cards[cardId] = Math.min(CARDS[cardId].maxLevel, previousLevel + 1);
-  let disposition = previousLevel ? 'fused' : 'collected';
-  if (!state.equipped.includes(cardId) && state.equipped.length < 3) {
-    state.equipped.push(cardId);
-    disposition = previousLevel ? 'fused' : 'equipped';
+  if (!state.progressionV2) {
+    if (!state.pendingReward || !state.pendingReward.choices.includes(cardId)) throw new Error('這張卡不在目前獎勵中');
+    const previousLevel = state.cards[cardId] ?? 0;
+    state.cards[cardId] = Math.min(CARDS[cardId].maxLevel, previousLevel + 1);
+    let disposition = previousLevel ? 'fused' : 'collected';
+    if (!state.equipped.includes(cardId) && state.equipped.length < 3) { state.equipped.push(cardId); disposition = previousLevel ? 'fused' : 'equipped'; }
+    if (!state.rewardClaims.includes('reward:integration-kit')) state.rewardClaims.push('reward:integration-kit');
+    state.pendingReward = null; state.stateVersion += 1;
+    return { state, reward: { kind: 'card', cardId, previousLevel, level: state.cards[cardId], disposition } };
   }
-  if (!state.rewardClaims.includes('reward:integration-kit')) state.rewardClaims.push('reward:integration-kit');
-  state.pendingReward = null;
+  const previousLevel = state.cards[cardId] ?? 0;
+  const output = choosePendingRunReward(state, cardId);
   state.stateVersion += 1;
-  return { state, reward: { cardId, previousLevel, level: state.cards[cardId], disposition } };
+  const reward = output.reward.kind === 'card'
+    ? { ...output.reward, cardId: output.reward.cardId, previousLevel, level: state.cards[output.reward.cardId], disposition: previousLevel ? 'fused' : 'collected' }
+    : { ...output.reward, cardId: null, previousLevel: 0, level: 0, disposition: output.reward.kind };
+  return { state, reward, repeated: output.repeated };
 }
 
 export function case02PublicView(state) {
@@ -370,6 +385,7 @@ export function case02PublicView(state) {
     cards: Object.entries(state.cards).map(([id, level]) => ({ id, name: CARDS[id].name, level, equipped: state.equipped.includes(id) })),
     contract: state.contract ? { ...state.contract, aligned: contractScore(state.contract), total: 3 } : null,
     normalization: clone(state.normalization),
+    preIntegrationDebt: state.preIntegrationDebt ?? 0,
     integration: clone(state.integration),
     change: clone(state.change),
     tests: { ...clone(state.tests), stale: state.tests.testedRevision !== null && state.tests.testedRevision !== state.dataRevision },

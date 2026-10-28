@@ -1,7 +1,7 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
 import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
-import { loadCareer, saveCareer, settleCase } from '../career/state.js';
+import { loadCareer, reserveRun, saveActiveRun, saveCareer, settleCase } from '../career/state-v2.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
@@ -14,7 +14,7 @@ let setup = career
   ? { templateId: career.templateId, draw: openingChoices(seed, career.cards), selected: [], career }
   : { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
 let state = null;
-let screen = careerMode && !career ? 'career-error' : career ? 'cards' : 'intro';
+let screen = careerMode && !career ? 'career-error' : 'intro';
 let selectedAction = null;
 let actionOptions = {};
 let lastResult = null;
@@ -23,6 +23,20 @@ let careerSettlement = null;
 let localCoach = null;
 let localAnalysis = null;
 let analysisRequest = 0;
+
+if (career?.activeRun?.caseId === 'case-01') {
+  state = { ...structuredClone(career.activeRun.state), runId: career.activeRun.runId };
+  operation = Object.keys(state.operationResults ?? {}).length;
+  screen = state.ending ? 'ending' : state.pendingUpgrade ? 'upgrade' : 'play';
+} else if (career?.activeRun) {
+  screen = 'career-error';
+  careerLoad.reason = `已有 ${career.activeRun.caseId} 進行中的案件；請先回到該案件。`;
+}
+
+function persistActive() {
+  if (!career || !state?.runId || state.ending) return;
+  career = saveCareer(saveActiveRun(career, state.runId, state));
+}
 
 function view() { return state ? projectNarrativeView(state) : null; }
 
@@ -61,12 +75,18 @@ function render() {
 function nextOperation() { operation += 1; return `ui-${operation}`; }
 
 function start() {
-  state = createNarrativeGame({
+  const initialState = createNarrativeGame({
     seed,
     templateId: setup.templateId,
     selectedCards: setup.selected,
-    ...(career ? { careerCards: career.cards, careerEquipped: career.equipped } : {}),
+    ...(career ? { careerCards: career.cards, careerEquipped: career.loadoutsByCase['case-01'], skipOpeningReward: true } : {}),
   });
+  if (career) {
+    const reserved = reserveRun(career, { caseId: 'case-01', rulesVersion: initialState.ruleVersion ?? 'case-01@1', initialState });
+    career = reserved.career;
+    state = { ...initialState, runId: reserved.activeRun.runId };
+    career = saveCareer(saveActiveRun(career, state.runId, state));
+  } else state = initialState;
   screen = 'play'; render();
 }
 
@@ -95,7 +115,7 @@ root.addEventListener('click', async (e) => {
   if (template) {
     setup.templateId = template.dataset.template; render(); return;
   }
-  if (e.target.closest('[data-next="cards"]')) { screen = 'cards'; render(); return; }
+  if (e.target.closest('[data-next="cards"]')) { if (career) start(); else { screen = 'cards'; render(); } return; }
   if (e.target.closest('[data-back="intro"]')) { screen = 'intro'; render(); return; }
   const cardInput = e.target.closest('[data-card]');
   if (cardInput) {
@@ -134,18 +154,18 @@ root.addEventListener('click', async (e) => {
     root.querySelectorAll('[data-option-check]').forEach((el) => { actionOptions[el.dataset.optionCheck] = el.checked; });
     try {
       const out = performAction(state, selectedAction, { ...actionOptions, operationId: nextOperation(), stateVersion: state.stateVersion });
-      state = out.state; lastResult = { ...out.result, cached: out.cached }; screen = state.ending ? 'ending' : 'result';
+      state = out.state; persistActive(); lastResult = { ...out.result, cached: out.cached }; screen = state.ending ? 'ending' : 'result';
     } catch (err) { lastResult = { type: 'gap', message: err.message }; screen = 'result'; }
     render(); return;
   }
   if (e.target.closest('[data-rest]')) {
-    try { const out = rest(state, { operationId: nextOperation(), stateVersion: state.stateVersion }); state = out.state; lastResult = out.result; }
+    try { const out = rest(state, { operationId: nextOperation(), stateVersion: state.stateVersion }); state = out.state; persistActive(); lastResult = out.result; }
     catch (err) { lastResult = { type: 'gap', message: err.message }; }
     screen = 'result'; render(); return;
   }
   if (e.target.closest('[data-continue]')) { screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
   const upgrade = e.target.closest('[data-upgrade]');
-  if (upgrade) { state = chooseUpgrade(state, upgrade.dataset.upgrade); screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
+  if (upgrade) { state = chooseUpgrade(state, upgrade.dataset.upgrade); persistActive(); screen = view().pendingUpgrade ? 'upgrade' : 'play'; render(); return; }
   if (e.target.closest('[data-analyze-run]')) {
     await analyzeCurrentRun(false);
     return;
@@ -255,4 +275,4 @@ async function discoverLocalCoach() {
   }
 }
 
-// GitHub Pages is a static build: do not probe localhost or any server capability.
+// Static Pages build: never probe a local capability or expose coach controls.

@@ -1,5 +1,6 @@
 import { ACTIONS, CARDS, SIMULATION_NOTICE, TEMPLATES } from '../narrative/rules.js';
 import { ACTION_SCENES } from '../narrative/narrative-copy.js';
+import { renderEndingFacets } from '../presentation/ending-stage.js';
 import {
   actionIllustration,
   cardIllustration,
@@ -31,6 +32,14 @@ const PURPOSES = Object.freeze({
 });
 
 export function renderIntro(setup) {
+  if (setup.career) {
+    const template = TEMPLATES[setup.career.templateId];
+    const loadout = setup.career.loadoutsByCase?.['case-01'] ?? [];
+    const tools = loadout.length
+      ? loadout.map((id) => `<article class="card tool-card">${cardIllustration(id, setup.career.cards[id])}<span class="card-copy"><span class="card-kicker">本案已啟用 · Lv.${setup.career.cards[id]}</span><strong>${esc(CARDS[id].name)}</strong><span>${esc(setup.career.cards[id] > 1 ? CARDS[id].upgradeDescription : CARDS[id].description)}</span></span></article>`).join('')
+      : '<p class="notice">本案目前沒有啟用卡；卡庫仍完整保留，可回大廳改裝後再開始。</p>';
+    return `<section class="hero screen intro-screen"><div class="stage-header"><div class="stage-copy"><div class="eyebrow">職涯案件 01 · 共用起手卡</div><h1>${esc(template.name)}，帶著大廳裝備開工</h1><p class="lede">角色模板與起手卡已在職涯建立時決定；這裡不會再抽一次開場獎勵。合法完成或止損後，下一個新 run 仍可在進度 2／4 各選一次成長。</p><div class="actions lead-actions"><button class="button" data-next="cards">用目前裝備開始案件 01</button><a class="button secondary" href="./index.html">回大廳改裝</a></div></div><div class="portrait-wrap">${characterPortrait(template.id)}</div></div><p class="notice">持有卡留在職涯卡庫；只有下方列出的案件 01 裝備會生效。${esc(SIMULATION_NOTICE)}</p><div class="section-heading"><div><span class="section-number">01</span><h2>本案啟用工具</h2></div><p>${loadout.length} / 3 張；跨案卡不會被刪除或偷偷改裝。</p></div><div class="grid tool-grid">${tools}</div></section>`;
+  }
   const templates = Object.values(TEMPLATES).map((template) => `
     <button class="card template-card ${setup.templateId === template.id ? 'selected' : ''}" data-template="${template.id}" aria-pressed="${setup.templateId === template.id}">
       <span class="portrait-wrap">${characterPortrait(template.id)}</span>
@@ -180,6 +189,12 @@ export function renderUpgrade(view) {
   const index = reward.threshold === 2 ? 1 : 2;
   const owned = Object.fromEntries((view.collection ?? view.tools).map((tool) => [tool.id, tool.level]));
   const cards = reward.choices.map((id) => {
+    const alternative = {
+      'shard-1': ['靈感碎片 ×1', '永久保存；集滿三片可融合一張未滿級卡。'],
+      'shard-2': ['靈感碎片 ×2', '更快接近一次自由融合，不會吞掉本次獎勵。'],
+      'career-exp-2': ['資深費 EXP ×2', '卡片都滿級時仍保有永久職涯價值。'],
+    }[id];
+    if (alternative) return `<button class="card tool-card upgrade-card" data-upgrade="${id}"><span class="card-copy"><span class="card-kicker">永久職涯替代獎勵</span><strong>${esc(alternative[0])}</strong><span>${esc(alternative[1])}</span></span></button>`;
     const level = owned[id] ?? 0;
     const stored = view.tools.length >= 3 && !view.tools.some((tool) => tool.id === id);
     const mode = level ? `融合升級 · Lv.${level} → Lv.${level + 1}` : stored ? '取得新卡 · 收入卡庫' : '取得新卡 · Lv.1 並啟用';
@@ -237,8 +252,15 @@ export function renderEnding(view, options = {}) {
 function renderEndingWithLegacyCoach(view, options = {}) {
   const outcomeLabels = { E01: '正式交付', E02: '正式交付', E03: '正式交付', E04: '有限試用', E05: '展示原型', E06: '正式交付', E07: '進度交接', E08: '主動停止' };
   const facetLabels = { recovered: '修復後交付', 'high-stress': '高壓完成', 'on-time': '期限內完成', 'token-rich': 'Token 守財奴', 'token-gravekeeper': '額度的守墓人' };
-  const facets = view.ending.facets?.length ? `<p class="muted">狀態尾聲：${view.ending.facets.map((facet) => esc(facetLabels[facet])).join('、')}</p>` : '';
+  const facetCopy = {
+    recovered: '跌過一跤，但你把證據、修正與交付重新接回同一條線。',
+    'high-stress': '壓力錶差點把桌面燒穿；成果是真的，咖啡債也是真的。',
+    'on-time': '期限鐘還沒敲響，交付已經先抵達。',
+    'token-rich': 'Token 金庫大門關得比需求還緊：每一枚都守住了。',
+    'token-gravekeeper': '額度安詳長眠；你至少替它留下了一份可追溯交接。',
+  };
+  const facets = renderEndingFacets((view.ending.facets ?? []).map((facet) => ({ id: facet, title: facetLabels[facet], text: facetCopy[facet] })));
   const settlement = options.careerMode ? `<div class="coach-export career-settlement"><strong>職涯已結算</strong><p>本次新增 ${options.expGained ?? 0} EXP；已領過的里程碑不會重複發放。卡庫與融合已保存，Token、壓力與時間到此歸零。</p></div>` : '';
   const next = options.careerMode ? '<a class="button" href="./index.html" data-return-lobby>返回接案大廳</a>' : '<button class="button" data-new>用新種子再接一案</button>';
-  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<p class="muted">主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p>${settlement}<div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button>${next}</div></div></section>`;
+  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<details class="ending-rules"><summary>結局怎麼判定？</summary><p>主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p></details>${settlement}<div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button>${next}</div></div></section>`;
 }

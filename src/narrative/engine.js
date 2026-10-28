@@ -25,14 +25,14 @@ function draw(seed, key, ids, count) {
   }).slice(0, count);
 }
 
-export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 'balanced', attrs, selectedCards, careerCards, careerEquipped } = {}) {
+export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 'balanced', attrs, selectedCards, careerCards, careerEquipped, skipOpeningReward = false } = {}) {
   const template = TEMPLATES[templateId];
   if (!template) throw new Error('未知模板');
   const abilities = attrs ?? template.attrs;
   assertAttributes(abilities);
   const careerMode = careerCards !== undefined || careerEquipped !== undefined;
   const openingDraw = openingChoices(seed, careerMode ? careerCards : undefined);
-  const picked = selectedCards ?? openingDraw.slice(0, 1);
+  const picked = selectedCards?.length ? selectedCards : openingDraw.slice(0, 1);
   if (picked.length !== 1 || picked.some((id) => !openingDraw.includes(id))) throw new Error('必須從開局三張卡選一張');
   let cards;
   let equipped;
@@ -46,8 +46,10 @@ export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 
     equipped = [...new Set(careerEquipped ?? [])].filter((id) => CASE01_CARD_IDS.includes(id));
     if (equipped.length > 3 || equipped.some((id) => !cards[id])) throw new Error('職涯啟用卡格式不合法');
     const rewardId = picked[0];
-    cards[rewardId] = Math.min(CARDS[rewardId].maxLevel, (cards[rewardId] ?? 0) + 1);
-    if (!equipped.includes(rewardId) && equipped.length < 3) equipped.push(rewardId);
+    if (!skipOpeningReward) {
+      cards[rewardId] = Math.min(CARDS[rewardId].maxLevel, (cards[rewardId] ?? 0) + 1);
+      if (!equipped.includes(rewardId) && equipped.length < 3) equipped.push(rewardId);
+    }
   } else {
     equipped = [...picked];
     cards = Object.fromEntries(equipped.map((id) => [id, 1]));
@@ -66,14 +68,16 @@ export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 
     context: { factsSaved: false, sessionLabel: null, jobsSinceSummary: 0, summaryRevision: 0 },
     revisions: Object.fromEntries(Object.keys(ACTIONS).map((id) => [id, 1])), answerRevision: 0,
     applicationRevisions: Object.fromEntries(Object.keys(ACTIONS).map((id) => [id, 0])),
-    eventDecisions: {}, resolved: {}, resolvedKeyByAction: {}, lastOptionsByAction: {}, operationResults: {}, operationPayloads: {}, ledger: [], xp: 0, pendingUpgrades: [], claimedThresholds: [],
+    eventDecisions: {}, resolved: {}, resolvedKeyByAction: {}, lastOptionsByAction: {}, operationResults: {}, operationPayloads: {}, ledger: [], xp: 0, pendingUpgrades: [], claimedThresholds: [], careerRewards: [], rewardClaims: [],
     analysisPrep: 0, firstVerifyUsed: false, extraWishSeen: false, scopeNegotiated: false,
-    repairHistory: false, rollbackAvailable: false, checkpoint: null, lastEvent: null, log: [], ending: null,
+    repairHistory: false, rollbackAvailable: false, checkpoint: null, lastEvent: null, eventCounts: {}, retryUnderstanding: {}, retryCounts: {}, cardUsage: {}, log: [], ending: null,
   };
 }
 
 export function openingChoices(seed = 'preview', cardLevels) {
-  const ids = [...CASE01_CARD_IDS];
+  // Direct classic play keeps the original six-card draw. Career runs can
+  // collect the shared Case 01 cards without silently changing v1 behavior.
+  const ids = cardLevels ? [...CASE01_CARD_IDS] : ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
   if (!cardLevels) return draw(seed, 'opening-cards', ids, 3);
   const useful = ids.filter((id) => (cardLevels[id] ?? 0) < CARDS[id].maxLevel);
   const usefulDraw = draw(seed, 'opening-cards', useful, Math.min(3, useful.length));
@@ -87,7 +91,8 @@ function milestone(state, id, value = 1) {
   state.ledger.push(id);
   state.xp += value;
   if (state.phase !== 'playing') return;
-  for (const threshold of LIMITS.cardRewardThresholds) {
+  const thresholds = state.careerCardsSnapshot ? [2, 4] : LIMITS.cardRewardThresholds;
+  for (const threshold of thresholds) {
     if (state.xp >= threshold && !state.claimedThresholds.includes(threshold) && !state.pendingUpgrades.includes(threshold)) {
       state.pendingUpgrades.push(threshold);
     }
@@ -202,9 +207,11 @@ function pickEvent(state, actionId, options, eventKey) {
       if (actionId === 'A07' && state.documents.confirmed) value += 5;
       if (actionId === 'A07' && state.analysisPrep > 0) value += 10;
       if (actionId === 'A11' && cardLevel(state, 'C4')) value += 10 * cardLevel(state, 'C4');
+      if (state.careerCardsSnapshot) value += state.retryUnderstanding?.[actionId] ?? 0;
       value = Math.max(1, value);
     }
     if (options?.useC2 && ['A05', 'A07'].includes(actionId) && index > 0) value += 5;
+    if (state.careerCardsSnapshot && index > 0 && state.lastEvent?.actionId === actionId && state.lastEvent?.event?.id === item.id) value *= 0.25;
     return value;
   });
   return weightedPick(items, weights, unitFor(state.seed, eventKey));
@@ -426,13 +433,20 @@ function updateDependentInputs(state, actionId) {
   if (actionId !== 'A10') state.revisions.A10 += 1;
 }
 
-function actionCost(state, actionId, options = {}) {
+function actionCost(state, actionId, options = {}, retryOverride = null) {
+  state.retryUnderstanding ??= {};
+  state.retryCounts ??= {};
+  state.cardUsage ??= {};
+  state.eventCounts ??= {};
   let cost = ACTIONS[actionId].cost;
+  const retry = retryOverride ?? Boolean(state.careerCardsSnapshot && (options.newRevision || options.repairDraft) && state.resolvedKeyByAction[actionId]);
+  const c13 = retry ? cardLevel(state, 'C13') : 0;
   if (options.useC2 && cardLevel(state, 'C2') && ['A05', 'A07'].includes(actionId)) cost = Math.max(1, cost - cardLevel(state, 'C2'));
   if (actionId === 'A08' && cardLevel(state, 'C6') && (!state.firstVerifyUsed || cardLevel(state, 'C6') === 2)) cost = Math.max(0, cost - 1);
+  if (c13) cost = Math.max(1, cost - 1);
   const overtime = state.timeLeft === 0;
   const totalCost = cost + (overtime ? 1 : 0) + (options.useC3 && cardLevel(state, 'C3') && ['A08', 'A09'].includes(actionId) ? 1 : 0);
-  return { cost: totalCost, overtime };
+  return { cost: totalCost, overtime, timeCost: retry && c13 >= 2 ? 0 : 1, retry, retryLearningGain: retry ? Math.min(26 - (state.retryUnderstanding[actionId] ?? 0), [12, 8, 4, 2][Math.min(state.retryCounts[actionId] ?? 0, 3)] + (c13 ? (c13 >= 2 ? 6 : 4) : 0)) : 0 };
 }
 
 export function previewAction(original, actionId, options = {}) {
@@ -440,8 +454,9 @@ export function previewAction(original, actionId, options = {}) {
   const state = clone(original);
   if (options.newRevision || options.repairDraft) state.revisions[actionId] += 1;
   if (state.resolved[eventKeyFor(state, actionId, options)]) return { cached: true, cost: 0, overtime: false };
-  const { cost, overtime } = actionCost(state, actionId, options);
-  return { cached: false, cost, overtime };
+  const cost = actionCost(state, actionId, options);
+  if (!state.careerCardsSnapshot) return { cached: false, cost: cost.cost, overtime: cost.overtime };
+  return { cached: false, ...cost, refund: cost.cost >= 3 && cardLevel(state, 'C16') && (state.cardUsage.C16 ?? 0) < cardLevel(state, 'C16') ? 1 : 0 };
 }
 
 function resourceSnapshot(state) {
@@ -567,6 +582,7 @@ export function performAction(original, actionId, options = {}) {
     return { state, result, cached: false };
   }
 
+  const retryForExecution = Boolean(state.careerCardsSnapshot && (options.newRevision || options.repairDraft) && state.resolvedKeyByAction[actionId]);
   if (options.newRevision || options.repairDraft) {
     state.revisions[actionId] += 1;
     delete state.resolvedKeyByAction[actionId];
@@ -580,21 +596,51 @@ export function performAction(original, actionId, options = {}) {
   if (options.designate && !legal.includes(options.designate)) throw new Error('指定事件不合法');
   if (!legal.length) return { state: original, result: { type: 'not-applicable', message: '這個問題已解決，或目前沒有適用內容。' }, cached: false };
 
-  const { cost: totalCost, overtime } = actionCost(state, actionId, options);
+  state.retryUnderstanding ??= {};
+  state.retryCounts ??= {};
+  state.cardUsage ??= {};
+  const costPreview = actionCost(state, actionId, options, retryForExecution);
+  const { cost: totalCost, overtime, timeCost, retry, retryLearningGain } = costPreview;
   if (overtime && state.overtimeUsed >= 2) throw new Error('加班次數已用完，只能交付或停止');
   if (state.token < totalCost) throw new Error('Token 不足；請休息、交付或停止');
 
   const key = eventKeyFor(state, actionId, options);
   if (state.resolved[key]) return { state: original, result: clone(state.resolved[key]), cached: true };
-  state.token -= totalCost; state.workCount += 1; state.timeLeft = Math.max(0, state.timeLeft - 1);
+  if (retry) {
+    state.retryUnderstanding[actionId] = Math.min(26, (state.retryUnderstanding[actionId] ?? 0) + retryLearningGain);
+    state.retryCounts[actionId] = (state.retryCounts[actionId] ?? 0) + 1;
+  }
+  state.token -= totalCost; state.workCount += 1; state.timeLeft = Math.max(0, state.timeLeft - timeCost);
+  let tokenRefund = 0;
+  if (totalCost >= 3 && cardLevel(state, 'C16') && (state.cardUsage.C16 ?? 0) < cardLevel(state, 'C16')) {
+    state.cardUsage.C16 = (state.cardUsage.C16 ?? 0) + 1;
+    state.token = Math.min(LIMITS.tokenCap, state.token + 1);
+    tokenRefund = 1;
+  }
   if (overtime) { state.overtimeUsed += 1; state.stress = clamp(state.stress + 2, 0, LIMITS.stressCap); }
   const decisionKey = decisionKeyFor(state, actionId, options);
   const decidedId = state.eventDecisions[decisionKey];
-  const chosen = decidedId ? EVENTS[actionId].find((event) => event.id === decidedId) : pickEvent(state, actionId, options, decisionKey);
+  let chosen = decidedId ? EVENTS[actionId].find((event) => event.id === decidedId) : pickEvent(state, actionId, options, decisionKey);
   if (!decidedId) state.eventDecisions[decisionKey] = chosen.id;
+  const pickedIndex = EVENTS[actionId].findIndex((event) => event.id === chosen.id);
+  const c14Uses = cardLevel(state, 'C14');
+  const partialFrom = pickedIndex === 1 && c14Uses > (state.cardUsage.C14 ?? 0) ? chosen.id : null;
+  if (partialFrom) {
+    state.cardUsage.C14 = (state.cardUsage.C14 ?? 0) + 1;
+    chosen = EVENTS[actionId][0];
+  }
   applyEvent(state, actionId, chosen, options);
-  const presentedEvent = eventForPresentation(chosen, options);
-  if (actionId === 'A01' && chosen.id !== 'A01-A') state.revisions.A01 += 1;
+  let presentedEvent = eventForPresentation(chosen, options);
+  const eventCount = (state.eventCounts[presentedEvent.id] ?? 0) + 1;
+  state.eventCounts[presentedEvent.id] = eventCount;
+  if (eventCount > 1) presentedEvent = { ...presentedEvent, summary: `${presentedEvent.summary}（續篇 ${eventCount}：前次理解有承接，剛出現的同事件權重已降低。）` };
+  if (actionId === 'A01' && chosen.id !== 'A01-A') {
+    state.revisions.A01 += 1;
+    for (const affected of ['A04', 'A05', 'A07', 'A08', 'A09']) {
+      state.retryUnderstanding[affected] = Math.floor((state.retryUnderstanding[affected] ?? 0) / 2);
+      state.retryCounts[affected] = Math.floor((state.retryCounts[affected] ?? 0) / 2);
+    }
+  }
   updateDependentInputs(state, actionId);
   if (actionId === 'A08') state.firstVerifyUsed = true;
   state.context.jobsSinceSummary = actionId === 'A10' ? 0 : state.context.jobsSinceSummary + 1;
@@ -604,7 +650,12 @@ export function performAction(original, actionId, options = {}) {
     event: clone(presentedEvent),
     process: buildProcess({ actionId, event: presentedEvent, options, stateBefore: original, stateAfter: state }),
     cost: totalCost,
+    timeCost,
     overtime,
+    retry: retry ? { learningGain: retryLearningGain, total: state.retryUnderstanding[actionId] } : null,
+    partial: Boolean(partialFrom),
+    partialFrom,
+    cardEffects: { tokenRefund },
     key,
     recordId: `${state.caseId}-result-${state.workCount}-${state.stateVersion + 1}`,
     semanticOptions: executionOptions(actionId, options),
@@ -641,8 +692,12 @@ export function rest(original, { operationId, stateVersion } = {}) {
 
 export function upgradeChoices(state, threshold = state.pendingUpgrades[0]) {
   if (!state.pendingUpgrades.includes(threshold)) return [];
-  const pool = CASE01_CARD_IDS.filter((id) => (state.cards[id] ?? 0) < (CARDS[id].maxLevel ?? 1));
-  return draw(state.seed, `upgrade:${threshold}`, pool, Math.min(3, pool.length));
+  const eligibleIds = state.careerCardsSnapshot ? CASE01_CARD_IDS : ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
+  const pool = eligibleIds.filter((id) => (state.cards[id] ?? 0) < (CARDS[id].maxLevel ?? 1));
+  const choices = draw(state.seed, `upgrade:${threshold}`, pool, Math.min(3, pool.length));
+  if (!state.careerCardsSnapshot) return choices;
+  const alternatives = ['shard-1', 'shard-2', 'career-exp-2'];
+  return [...choices, ...alternatives.slice(0, 3 - choices.length)];
 }
 
 export function chooseUpgrade(original, cardId) {
@@ -650,6 +705,19 @@ export function chooseUpgrade(original, cardId) {
   const threshold = state.pendingUpgrades[0];
   const choices = upgradeChoices(state, threshold);
   if (!choices.includes(cardId)) throw new Error('升級選擇不在本輪選項');
+  const alternative = {
+    'shard-1': { kind: 'shard', amount: 1, title: '靈感碎片 ×1' },
+    'shard-2': { kind: 'shard', amount: 2, title: '靈感碎片 ×2' },
+    'career-exp-2': { kind: 'career-exp', amount: 2, title: '資深費 EXP ×2' },
+  }[cardId];
+  if (alternative) {
+    const slot = threshold === 2 ? 1 : 2;
+    state.careerRewards.push({ ...alternative, claimId: `reward:milestone-${slot}` });
+    state.rewardClaims.push(`reward:milestone-${slot}`);
+    state.pendingUpgrades.shift(); state.claimedThresholds.push(threshold); state.stateVersion += 1;
+    state.log.push({ actionId: 'UPGRADE', cardId, threshold, kind: alternative.kind, options: {}, resourcesAfter: resourceSnapshot(state) });
+    return state;
+  }
   const previousLevel = state.cards[cardId] ?? 0;
   state.cards[cardId] = Math.min(CARDS[cardId].maxLevel ?? 1, previousLevel + 1);
   if (!state.equipped.includes(cardId) && state.equipped.length < 3) state.equipped.push(cardId);
