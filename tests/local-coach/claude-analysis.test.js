@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { buildClaudeInvocation, createClaudeAnalysisService } from '../../src/local-coach/claude-analysis.js';
 import { createRunWriter } from '../../src/local-coach/run-writer.js';
-import { syntheticCase02Run, syntheticCase03Run, syntheticRun } from '../mcp/fixtures.js';
+import { syntheticCase02Run, syntheticCase03Run, syntheticCase04Run, syntheticRun } from '../mcp/fixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const FAKE = path.join(ROOT, 'tests', 'local-coach', 'fake-claude.mjs');
@@ -91,10 +91,10 @@ test('successful analysis uses stdin, returns structured data, and same-run retr
   assert.equal(calls.length, 2);
 });
 
-test('the same fixed three-tool stub analysis accepts case 02 and case 03 records', async (t) => {
-  const runs = await fs.mkdtemp(path.join(os.tmpdir(), 'aieg-analysis-three-case-'));
+test('the same fixed three-tool stub analysis accepts case 02, case 03 and case 04 records', async (t) => {
+  const runs = await fs.mkdtemp(path.join(os.tmpdir(), 'aieg-analysis-four-case-'));
   t.after(() => fs.rm(runs, { recursive: true, force: true }));
-  const records = [syntheticCase02Run(), syntheticCase03Run()];
+  const records = [syntheticCase02Run(), syntheticCase03Run(), syntheticCase04Run()];
   const writer = createRunWriter(runs);
   for (const record of records) await writer.save(record);
   for (const record of records) {

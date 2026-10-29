@@ -2,6 +2,7 @@ import { TEMPLATES } from '../narrative/rules.js';
 import { CARDS } from '../career/cards.js';
 import { CASE02_ACTIONS, CONTRACT_OPTIONS, NORMALIZATION_STRATEGIES } from './rules.js';
 import { case02CardLevel, case02PublicView, previewCase02Action } from './engine-v2.js';
+import { case02ConsequenceChoices, case02OpportunityChoices, case02RecoveryChoices } from './story.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
@@ -42,6 +43,9 @@ function status(view) {
 }
 
 function availability(state, actionId) {
+  if (actionId === 'B10' && !state.story?.openRecovery) return '失敗後才會出現新的救援路線';
+  if (actionId === 'B11' && !state.story?.openOpportunity) return '關鍵成功後才會出現追加選擇';
+  if (actionId === 'B12' && !case02ConsequenceChoices(state).length) return '延後後果浮現後才需要處理';
   if (actionId === 'B02' && !state.contract) return '先建立契約';
   if (actionId === 'B03' && !state.normalization?.complete) return '先正規化來源';
   if (actionId === 'B04' && !state.change.announced) return '整合後才會收到變更';
@@ -52,10 +56,12 @@ function availability(state, actionId) {
 
 export function renderCase02Board(state, message = '') {
   const view = case02PublicView(state);
-  const actions = Object.values(CASE02_ACTIONS).map((action, index) => {
+  const actions = Object.values(CASE02_ACTIONS)
+    .filter((action) => !['B10', 'B11', 'B12'].includes(action.id) || !availability(state, action.id))
+    .map((action, index) => {
     const reason = availability(state, action.id);
     return `<article class="action-card ${reason ? 'locked' : ''}"><div><span class="mark">${String(index + 1).padStart(2, '0')}</span><h3>${esc(action.title)}</h3><p>${esc(action.tutorial)}</p></div><button ${reason ? 'disabled' : ''} data-case02-action="${action.id}">${reason ? esc(reason) : '查看成本與選項'}</button></article>`;
-  }).join('');
+    }).join('');
   const tools = view.cards.filter((card) => card.equipped).map((card) => `<span class="tag">${esc(card.name)} Lv.${card.level}</span>`).join('') || '<span class="tag">未裝備卡</span>';
   return shell(`${hud(view)}${message ? `<p class="notice" role="status">${esc(message)}</p>` : ''}<div class="layout"><section class="panel"><div class="eyebrow">資料版本 ${view.dataRevision}</div><h1>現在該處理哪個真相？</h1><p>裝備效果：${tools}</p><div class="action-grid">${actions}</div></section>${status(view)}</div>`);
 }
@@ -69,6 +75,9 @@ function radio(name, value, checked, title, detail, disabled = false) {
 }
 
 function controls(state, actionId, options, view) {
+  if (actionId === 'B10') return `<div class="radio-list">${case02RecoveryChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
+  if (actionId === 'B11') return `<div class="radio-list">${case02OpportunityChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
+  if (actionId === 'B12') return `<div class="radio-list">${case02ConsequenceChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
   if (actionId === 'B01') return contractControls(options);
   if (actionId === 'B02') {
     const strategies = Object.values(NORMALIZATION_STRATEGIES).map((item) => radio('strategy', item.value, options.strategy === item.value, item.label, `基礎：${item.token} Token／${item.time} 時間／${item.baseDebt} 整合債`)).join('');

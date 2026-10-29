@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RUN_LIMITS } from '../../src/postgame/run-schema.js';
-import { syntheticRun, sha256 } from './fixtures.js';
+import { syntheticCase04Run, syntheticRun, sha256 } from './fixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ENTRY = path.join(ROOT, 'tests/helpers/mcp-test-server.mjs');
@@ -114,6 +114,56 @@ test('real stdio accepts standard request _meta while still validating its shape
   client.send({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'list_runs', arguments: {}, _meta: 'not-an-object' } });
   assert.equal((await client.next()).error.code, -32602);
   await client.close();
+});
+
+test('real stdio reads the public Case 04 record through the unchanged three-tool surface', async (t) => {
+  const record = syntheticCase04Run();
+  const client = await launch(t, record);
+  await initialize(client);
+  client.send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_run', arguments: { run_id: record.runId } } });
+  const response = await client.next();
+  assert.equal(response.result.isError, false);
+  assertToolTextBound(response);
+  const envelope = JSON.parse(response.result.content[0].text);
+  assert.equal(envelope.record.caseId, 'case-04');
+  assert.equal(envelope.record.gameRuleVersion, 'case-04-legacy@1');
+  assert.doesNotMatch(JSON.stringify(envelope), /"seed"|operationResults|eventWeights|rng/);
+  await client.close();
+  assert.equal(client.stderr, '');
+});
+
+test('real stdio get_rules distinguishes case 01 @2 from @3 and publishes case 04 without hidden data', async (t) => {
+  const client = await launch(t);
+  await initialize(client);
+  client.send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_rules', arguments: {} } });
+  const response = await client.next();
+  assert.equal(response.result.isError, false);
+  assertToolTextBound(response);
+  const rules = JSON.parse(response.result.content[0].text);
+  assert.ok(rules.supportedGameRuleVersions.includes('case-01-narrative@2'));
+  assert.ok(rules.supportedGameRuleVersions.includes('case-01-narrative@3'));
+  assert.ok(rules.supportedGameRuleVersions.includes('case-04-legacy@1'));
+  assert.match(rules.publicRules.branching, /舊案件 01 @2 進行中局不會套用 @3/);
+  const versions = rules.publicRulesByCase['case-01'].ruleVersions;
+  assert.deepEqual(versions['case-01-narrative@2'].branchActions, []);
+  assert.match(versions['case-01-narrative@2'].note, /沿用原規則/);
+  assert.deepEqual(versions['case-01-narrative@3'].branchActions, ['A13', 'A14']);
+  assert.equal(versions['case-01-narrative@3'].delayedConsequenceAfterMeaningfulWork, 2);
+  assert.match(versions['case-01-narrative@3'].note, /A07.*A13.*兩次後續工作.*A14/);
+  const case04 = rules.publicRulesByCase['case-04'].ruleVersions['case-04-legacy@1'];
+  assert.deepEqual(case04.strategies, ['patch', 'investigate', 'refactor', 'rollback']);
+  assert.equal(case04.delayedConsequenceAfterMeaningfulWork, 2);
+  assert.deepEqual(case04.scopeApproval.responses, ['approved', 'changes-requested']);
+  assert.equal(case04.scopeApproval.publicReasons, true);
+  assert.match(case04.note, /執行前.*退回補件.*模擬 agent 不能代簽/);
+  assert.equal(case04.rollbackCompatibilityDecisionRequired, true);
+  assert.equal(case04.scopeApproval.owner, '客戶／產品負責人');
+  assert.equal(case04.scopeApproval.boundToRevision, true);
+  assert.equal(case04.scopeApproval.agentMayApprove, false);
+  assert.doesNotMatch(JSON.stringify(rules.publicRulesByCase['case-01']), /"seed"|eventWeights|eventDecisions|functionState/);
+  assert.doesNotMatch(JSON.stringify(rules.publicRulesByCase['case-04']), /"seed"|eventWeights|eventDecisions|operationCache|rng/);
+  await client.close();
+  assert.equal(client.stderr, '');
 });
 
 test('unsupported version negotiates to server latest while supported older version is echoed', async (t) => {

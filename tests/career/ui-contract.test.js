@@ -4,17 +4,20 @@ import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('接案大廳接入已實作第二案，第三案仍明示籌備中', async () => {
+test('接案大廳保留前三案並接入已實作第四案', async () => {
   const source = await read('../../src/career/main.js');
   assert.match(source, /管好自己/);
   assert.match(source, /三張表格，一份真相/);
   assert.match(source, /大家都說只改一點點/);
+  assert.match(source, /昨天還好好的/);
   assert.match(source, /籌備中 · 沒有假按鈕/);
   assert.match(source, /case-02\.html\?mode=career/);
   assert.match(source, /case-03\.html\?mode=career/);
+  assert.match(source, /case-04\.html\?mode=career/);
   assert.match(source, /enableCase02/);
   assert.match(source, /'02': \{ available: true/);
   assert.match(source, /'03': \{ available: true/);
+  assert.match(source, /'04': \{ available: true/);
 });
 
 test('第一版入口保留，職涯首頁使用獨立程式與樣式', async () => {

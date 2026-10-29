@@ -23,7 +23,7 @@ async function freshCareer(page, base) {
   await page.waitFor('document.querySelectorAll("[data-starter-card]").length === 3');
   const starter = await page.eval('document.querySelector("[data-starter-card]").dataset.starterCard');
   await page.click(`[data-starter-card="${starter}"]`);
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
   return starter;
 }
 
@@ -75,7 +75,7 @@ async function claim03(page, slot) {
 async function careerAndCase1(page, base) {
   const starter = await freshCareer(page, base);
   const lobby = await page.eval(`({ projects: document.querySelectorAll('.project').length, starts: document.querySelectorAll('.project-start').length, saved: JSON.parse(localStorage.getItem('ai-engineer-game.career.v2')).career })`);
-  check('career', '角色後立即起手三選一並進入三案大廳', lobby.projects === 3 && lobby.starts === 3 && lobby.saved.starterSelection.cardId === starter);
+  check('career', '角色後立即起手三選一並進入四案大廳', lobby.projects === 4 && lobby.starts === 4 && lobby.saved.starterSelection.cardId === starter);
   await page.click('.project:nth-child(1) .project-start');
   await page.waitFor('document.querySelector("[data-next=cards]")');
   const intro = await page.text();
@@ -91,7 +91,7 @@ async function careerAndCase1(page, base) {
   await page.eval(`(() => { const s = window.__AIEG_NARRATIVE_TEST__.state; s.phase = 'ended'; s.ledger = ['requirements_clear','confirmed_spec','working_core','full_verification','final_delivery']; s.ending = { id:'E01', baseId:'E01', title:'測試交付', text:'固定合成路線', facets:[] }; window.__AIEG_NARRATIVE_TEST__.setState(s); })()`);
   await page.waitFor('document.querySelector("[data-return-lobby]")');
   await page.click('[data-return-lobby]');
-  await page.waitFor('document.querySelectorAll(".project").length === 3');
+  await page.waitFor('document.querySelectorAll(".project").length === 4');
   const settled = await page.eval('JSON.parse(localStorage.getItem("ai-engineer-game.career.v2")).career');
   check('career', '結算清除 active run 並保留 settled run', !settled.activeRun && Object.keys(settled.settledRuns).length === 1 && settled.completedCases['case-01'].plays === 1);
   await page.setViewport(360, 800, true);
@@ -164,8 +164,8 @@ async function main() {
     await case02(browser.page, base);
     await case03(browser.page, base);
     const external = browser.page.requests.filter((url) => !url.startsWith('http://127.0.0.1:') && !url.startsWith('data:') && url !== 'about:blank');
-    check('privacy', '三案沒有外部網路、localhost 教練或模型請求', external.length === 0, external.join(', '));
-    check('browser', '三案沒有 console／JavaScript 錯誤', browser.page.errors.length === 0, browser.page.errors.join(' | '));
+    check('privacy', '測試中的案件沒有外部網路、localhost 教練或模型請求', external.length === 0, external.join(', '));
+    check('browser', '測試中的案件沒有 console／JavaScript 錯誤', browser.page.errors.length === 0, browser.page.errors.join(' | '));
   } catch (error) {
     check('browser', '完整改版瀏覽器流程', false, error.stack ?? error.message);
     await shot(browser.page, 'error').catch(() => {});

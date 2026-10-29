@@ -4,7 +4,7 @@
 
 這個按鈕會使用目前 Claude Code 登入帳號的額度，並將該局公開遊戲紀錄傳給 Claude 服務；不需要 API key，也不是離線功能。GitHub Pages 沒有本機 capability，整個入口不會渲染。若一鍵流程不可用，下面的手動 MCP 步驟仍可作診斷／備援，但不是一般使用的主路徑。
 
-這個 MCP server 讓既有 Claude Code 讀取玩家在三個案件結算畫面按「存入本機賽後教練」自動存進 `runs/` 的遊戲局紀錄，協助回顧關鍵決策、資源代價與下一局改進方向。舊的案件 01 紀錄維持相容；案件 02／03 只新增規則版本與公開投影，不改既有三工具介面。
+這個 MCP server 讓既有 Claude Code 讀取玩家在四個案件結算畫面按「存入本機賽後教練」自動存進 `runs/` 的遊戲局紀錄，協助回顧關鍵決策、資源代價與下一局改進方向。舊的案件 01–03 紀錄維持相容；案件 04 只新增規則版本與公開投影，不改既有三工具介面。
 
 它不是遊戲內聊天，也不會呼叫模型。MCP server 仍是沒有 HTTP listener、網路功能、shell 工具、寫入／刪除工具或 API key 的 stdio 程序；只有三個唯讀 tool：
 
@@ -14,13 +14,14 @@
 
 ## 1. 從本機遊戲直接存入 runs
 
-1. 以 `npm start` 開啟 `http://127.0.0.1:8080/`，從大廳選案件 01、02 或 03。
+1. 以 `npm start` 開啟 `http://127.0.0.1:8080/`，從大廳選案件 01、02、03 或 04。
+   案件 04 的回滾相容／隔離決策與客戶／產品負責人範圍核准會寫入本局公開紀錄；模擬 agent 不會代簽。
 2. 完成或停止所選案件後，按「存入本機賽後教練」或「分析這局」。
 3. 畫面顯示成功與 `runId` 後，合法 JSON 已寫入專案的 `runs/<runId>.json`；不需下載或搬檔。
 
 JSON 只含公開遊戲資料；沒有姓名、帳號、金鑰、seed、事件權重、內部缺陷真值或未發生分支。`runs/*.json` 預設不進 Git。
 
-三案共用 `ai-engineer-game.run.v1` 信封；已知規則版本為 `case-01-narrative@2`、`case-02-csv@2`、`case-03-booking@1`。案件 02 只投影玩家看見的契約、整合債、測試與來源追溯；案件 03 只投影玩家看見的客戶決策、NPC 協作、契約、合併、變更與證據。未知版本或案件／規則不相符會明確拒絕，不會猜測或降級解析。
+四案共用 `ai-engineer-game.run.v1` 信封；已知規則版本為 `case-01-narrative@2`／`@3`、`case-02-csv@2`／`@3`、`case-03-booking@1`／`@2`、`case-04-legacy@1`。案件 02 只投影玩家看見的契約、整合債、測試與來源追溯；案件 03 只投影玩家看見的客戶決策、NPC 協作、契約、合併、變更與證據；案件 04 只投影玩家已見的策略、具名問題、相容決策、負責人範圍核准、回歸與交接。未知版本或案件／規則不相符會明確拒絕，不會猜測或降級解析。
 
 此按鈕只會在 `npm start` 的可信同源本機 server 回傳 capability 時出現。GitHub Pages 等純靜態版本不渲染教練入口，也不會呼叫 localhost。若本機 server 在儲存前停止，UI 會明確顯示失敗，不會假稱已寫入。
 
@@ -67,7 +68,7 @@ claude mcp get ai-engineer-postgame-coach
 - 寫入檔名只能是驗證過的 `<runId>.json`；同一內容重送為 idempotent，不同內容撞到同一 `runId` 時拒絕覆蓋。寫入後會由既有唯讀 store 真正讀回驗證。
 - 本機靜態 server 不提供 `runs/`、`.mcp.json`、`.claude/`、`.git/`、raw collaboration 或測試 artifacts 的下載路徑。CSRF／Host／Origin 邊界防的是第三方網頁借玩家瀏覽器寫入；它不宣稱能防禦已在本機帳號下執行的惡意程式。
 - 每個直接 `.json` 都會做 canonical containment、一般檔案與 reparse 檢查、bounded read、前後 identity 檢查，再驗證 schema。
-- 案件 02／03 沿用相同固定 `runs/` 根、Origin／Host／CSRF、防覆寫、大小限制、單一分析工作與結果 cache；沒有另開較寬鬆的路徑。
+- 案件 02／03／04 沿用相同固定 `runs/` 根、Origin／Host／CSRF、防覆寫、大小限制、單一分析工作與結果 cache；沒有另開較寬鬆的路徑。
 - 工具輸出中的玩家文字是不可信引用資料。server 不會跟隨其中「執行命令」「讀金鑰」「忽略規則」等內容。
 - server 本身完全離線；但一旦你在 Claude Code 呼叫工具，工具輸出會成為該 Claude session 的內容，資料處理仍依你的 Claude 方案與設定為準。
 - 不要把玩家局 JSON、`docs/collaboration/raw/` 或本機測試 artifact 直接放進公開 GitHub；發布前先做 release audit。

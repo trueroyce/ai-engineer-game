@@ -50,14 +50,14 @@ async function run(page, base) {
   check('keyboard', '角色選擇可用 Tab 聚焦且有可見焦點', focus.focusVisible && focus.outline !== 'none', JSON.stringify(focus));
   await page.press('Enter');
   await page.click('[data-create]');
-  await page.waitFor('document.querySelectorAll(".project").length === 3');
+  await page.waitFor('document.querySelectorAll(".project").length === 4');
   const lobby = await page.eval(`({
     projects: document.querySelectorAll('.project').length,
     starts: document.querySelectorAll('.project-start').length,
     preparing: document.querySelectorAll('.project.preparing').length,
     text: document.querySelector('#app').textContent
   })`);
-  check('lobby', '案件 01/02/03 都有開始入口', lobby.projects === 3 && lobby.starts === 3 && lobby.preparing === 0, JSON.stringify(lobby));
+  check('lobby', '案件 01/02/03/04 都有開始入口', lobby.projects === 4 && lobby.starts === 4 && lobby.preparing === 0, JSON.stringify(lobby));
   await shot(page, '01-lobby-desktop');
 
   await page.setViewport(390, 844, true);
@@ -84,7 +84,7 @@ async function run(page, base) {
   check('settlement', '結案自動保存 career EXP、卡庫與回大廳入口', firstSettlement.career.exp === 6 && Object.keys(firstSettlement.career.cards).length >= 1 && firstSettlement.text.includes('職涯已結算'), JSON.stringify(firstSettlement.career));
   await shot(page, '03-career-settlement');
   await page.click('[data-return-lobby]');
-  await page.waitFor('document.querySelectorAll(".project").length === 3');
+  await page.waitFor('document.querySelectorAll(".project").length === 4');
   check('settlement', '完成或止損後可回大廳看到跨案摘要', (await page.text()).includes('已結束 1 次'));
 
   await page.click('.project-start');

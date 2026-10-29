@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createNarrativeGame, performAction } from '../../src/narrative/engine.js';
 import { chooseCase02Reward, createCase02Game, performCase02Action } from '../../src/case-02/engine-v2.js';
 import { chooseCase03Reward, createCase03Game, performCase03Action } from '../../src/case-03/engine.js';
+import { chooseCase04Reward, createCase04Game, performCase04Action } from '../../src/case-04/engine.js';
 import { buildCareerCaseRunRecord } from '../../src/postgame/career-run-export.js';
 import { buildRunRecord } from '../../src/postgame/run-export.js';
 
@@ -48,6 +49,28 @@ export function syntheticCase03Run() {
   state = takeCase03(state, 'C05', { response: 'negotiate' });
   state = takeCase03(state, 'C06', { scope: 'full' });
   state = takeCase03(state, 'C07', { intent: 'verified' });
+  return buildCareerCaseRunRecord(state);
+}
+
+function takeCase04(state, actionId, options = {}) {
+  let next = performCase04Action(state, actionId, { ...options, operationId: `fixture-${actionId}-${state.stateVersion}`, stateVersion: state.stateVersion }).state;
+  if (next.pendingReward) next = chooseCase04Reward(next, next.pendingReward.choices[0]).state;
+  return next;
+}
+
+export function syntheticCase04Run() {
+  let state = createCase04Game({ templateId: 'balanced', seed: 44, eventRolls: Array(40).fill(1) });
+  state = takeCase04(state, 'D01', { method: 'reproduce' });
+  state = takeCase04(state, 'D02', { strategy: 'patch' });
+  state = takeCase04(state, 'D03', { agentMode: 'sequential' });
+  state = takeCase04(state, 'D04', { route: 'freeze' });
+  state = takeCase04(state, 'D05', { cause: 'code' });
+  state = takeCase04(state, 'D07', { scope: 'full' });
+  state = takeCase04(state, 'D06', { response: 'repair' });
+  state = takeCase04(state, 'D07', { scope: 'full' });
+  state = takeCase04(state, 'D08', { depth: 'complete' });
+  state = takeCase04(state, 'D11', { proposal: 'verified' });
+  state = takeCase04(state, 'D09', { intent: 'verified' });
   return buildCareerCaseRunRecord(state);
 }
 

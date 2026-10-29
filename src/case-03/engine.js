@@ -5,11 +5,19 @@ import { applyIntegrationShield, applyMajorChangeEvidence, applySpendRefund } fr
 import { choosePendingRunReward, grantRunProgress, initializeRunRewards } from '../career/run-rewards.js';
 import { initializeCaseAttempts, previewCaseAttempt, reviseCaseAttempts, runCaseAttempt } from '../core/case-attempt.js';
 import { composeEndingFacets } from '../core/ending-facets.js';
-import { CASE03_LIMITS, CASE03_REWARD_ID, CASE03_REWARD_POOL, STRATEGIES } from './rules.js';
+import {
+  case03StoryBlockers,
+  normalizeCase03Story,
+  observeCase03Story,
+  performCase03StoryAction,
+  previewCase03StoryAction,
+} from './story.js';
+import { CASE03_LIMITS, CASE03_REWARD_ID, CASE03_REWARD_POOL, CASE03_RULE_VERSION, STRATEGIES } from './rules.js';
 
 const clone = (value) => structuredClone(value);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const level = (state, id) => state.equipped.includes(id) ? (state.cards[id] ?? 0) : 0;
+const usesCase03Story = (state) => state.ruleVersion === CASE03_RULE_VERSION;
 const payload = (actionId, raw) => JSON.stringify({ actionId, ...Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'stateVersion')) });
 const FAILURE_EVENTS = Object.freeze({
   C01: [{ id: 'three-later', weight: 55 }, { id: 'owner-vacuum', weight: 45 }],
@@ -91,7 +99,7 @@ export function createCase03Game(options = {}) {
   const equipped = (options.equipped ?? []).filter((id) => cards[id]).slice(0, 3);
   const seed = Number.isInteger(options.seed) ? options.seed >>> 0 : randomSeed();
   const state = {
-    caseId: 'case-03', ruleVersion: 'case-03-booking@1', phase: 'playing', templateId: options.templateId,
+    caseId: 'case-03', ruleVersion: CASE03_RULE_VERSION, phase: 'playing', templateId: options.templateId,
     abilities: clone(TEMPLATES[options.templateId].attrs), token: 18, stress: 0, timeLeft: 12,
     cards, equipped, requirements: null, contract: null, implementation: null, merge: null,
     change: { announced: false, handled: false }, evidence: { revision: null, coverage: 0, trace: false, failed: [] },
@@ -99,12 +107,17 @@ export function createCase03Game(options = {}) {
     rewardLedgerSnapshot: clone(options.rewardLedger ?? []), stateVersion: 0, operationResults: {}, operationPayloads: {}, log: [], ending: null,
     seed, rng: { event: createStream(options.eventRolls ? { values: options.eventRolls } : { seed }), reward: createStream(options.rewardDraws ? { values: options.rewardDraws } : { seed: seed ^ 0x31ca5e03 }) }, eventAudit: [], cardUsage: {}, careerRewards: [],
     progressionV2: Boolean(options.progressionV2),
+    story: normalizeCase03Story(),
   };
   initializeCaseAttempts(state);
   return state.progressionV2 ? initializeRunRewards(state) : state;
 }
 
 export function previewCase03Action(state, actionId, options = {}) {
+  if (['C09', 'C10', 'C11'].includes(actionId)) {
+    if (!usesCase03Story(state)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    return previewCase03StoryAction({ ...state, story: normalizeCase03Story(state.story) }, actionId, options);
+  }
   if (actionId === 'C01') {
     if (!['core', 'full'].includes(options.scope)) throw new Error('請先選擇需求範圍');
     const coreToken = Math.max(1, 2 - level(state, 'C8'));
@@ -142,6 +155,9 @@ export function previewCase03Action(state, actionId, options = {}) {
 
 function blockers(state) {
   const list = [];
+  if (usesCase03Story(state)) {
+    for (const blocker of case03StoryBlockers(state)) if (!list.includes(blocker)) list.push(blocker);
+  }
   if (state.requirements?.scope === 'core') list.push('核心範圍未包含完整借用與取消責任');
   if (!state.requirements?.clear) list.push('需求矛盾尚未收斂');
   if (!state.contract?.approved) list.push('客戶尚未核准介面契約');
@@ -162,6 +178,19 @@ export function performCase03Action(original, actionId, raw = {}) {
     return { state: clone(original), result: clone(original.operationResults[raw.operationId]), cached: true };
   }
   if (raw.stateVersion !== original.stateVersion) throw new Error('stale_state_version');
+  if (['C09', 'C10', 'C11'].includes(actionId)) {
+    if (!usesCase03Story(original)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    const state = clone(original);
+    state.story = normalizeCase03Story(state.story);
+    if (actionId === 'C09' && !state.story.openRecovery) throw new Error('目前沒有待處理的失敗岔路');
+    if (actionId === 'C10' && !state.story.openOpportunity) throw new Error('目前沒有待處理的成功誘惑');
+    const output = performCase03StoryAction(state, actionId, raw);
+    state.stateVersion += 1;
+    state.operationPayloads[raw.operationId] = requestPayload;
+    state.operationResults[raw.operationId] = clone(output.result);
+    state.log.push({ actionId, options: { route: raw.route }, outcome: output.result.outcome, artifactRevision: state.artifactRevision, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
+    return { state, result: output.result, cached: false };
+  }
   if (actionId === 'C02' && !original.requirements) throw new Error('先處理需求矛盾');
   if (actionId === 'C03' && !original.contract?.approved) throw new Error('先取得客戶契約決策');
   if (actionId === 'C04' && !original.implementation?.complete) throw new Error('先完成分工實作');
@@ -300,6 +329,7 @@ export function performCase03Action(original, actionId, raw = {}) {
     }
   }
   if (spendRefund && result.process) result.process.consequence += ` Token 反芻胃返還 ${spendRefund} Token（本局次數有上限）。`;
+  if (usesCase03Story(state)) observeCase03Story(state, actionId, raw, result);
   recordMeaningfulAttempt(state, actionId);
   state.stateVersion += 1;
   state.operationPayloads[raw.operationId] = requestPayload;
@@ -339,6 +369,6 @@ export function case03PublicView(state) {
     requirements: clone(state.requirements), contract: clone(state.contract), implementation: clone(state.implementation), merge: clone(state.merge), change: clone(state.change),
     artifactRevision: state.artifactRevision, integrationDebt: state.integrationDebt, evidence: clone(state.evidence), blockers: blockers(state), verifiedReady: blockers(state).length === 0,
     cards: Object.entries(state.cards).map(([id, cardLevel]) => ({ id, name: CARDS[id].name, level: cardLevel, equipped: state.equipped.includes(id) })),
-    pendingReward: clone(state.pendingReward), rewardFallback: clone(state.rewardFallback), progression: state.progression ? { runExp: state.progression.runExp, progressKeys: [...state.progression.progressKeys], rewardMilestones: state.progression.rewardMilestones.map((item) => ({ slot: item.slot, status: item.status })) } : null, ending: clone(state.ending),
+    pendingReward: clone(state.pendingReward), rewardFallback: clone(state.rewardFallback), progression: state.progression ? { runExp: state.progression.runExp, progressKeys: [...state.progression.progressKeys], rewardMilestones: state.progression.rewardMilestones.map((item) => ({ slot: item.slot, status: item.status })) } : null, ending: clone(state.ending), ...(usesCase03Story(state) ? { story: normalizeCase03Story(state.story) } : {}),
   };
 }

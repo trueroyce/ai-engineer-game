@@ -4,6 +4,7 @@ import { cardIllustration } from '../narrative-ui/art.js';
 import { renderLocalCoachPanel } from '../postgame/coach-ui.js';
 import { renderEndingStage } from '../presentation/ending-stage.js';
 import { case02ActionArt, case02EndingArt, case02StatusArt, case02Tone } from './art.js';
+import { CASE02_ACTIONS } from './rules.js';
 
 export const renderCase02Error = legacy.renderCase02Error;
 
@@ -17,12 +18,22 @@ export function renderCase02Intro(career) {
 export function renderCase02Board(state, message = '') {
   let html = legacy.renderCase02Board(state, message);
   html = html.replace('<section class="panel">', `<section class="panel case-workspace">${case02StatusArt(state)}`);
-  const actionIds = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09'];
-  let index = 0;
-  return html.replace(/<article class="action-card ([^"]*)"><div><span class="mark">/g, (match, classes) => {
-    const actionId = actionIds[index++] ?? 'B03';
-    return `<article class="action-card action-${actionId.toLowerCase()} ${classes}"><div>${case02ActionArt(actionId)}<span class="mark">`;
-  });
+  const story = state.story;
+  const pending = Object.values(story?.commitments ?? {}).filter((value) => value === 'pending' || value === 'surfaced').length;
+  const strip = `<div class="story-strip"><strong>剛才的選擇留下什麼</strong><span>${story?.openRecovery ? '失敗開出新救援' : story?.openOpportunity ? '成功後仍可選擇' : pending ? `${pending} 個延後承諾等著結算` : '目前沒有未處理的故事承諾'}</span></div>`;
+  html = html.replace('<div class="action-grid">', `${strip}<div class="action-grid">`);
+  for (const actionId of Object.keys(CASE02_ACTIONS)) {
+    const button = `data-case02-action="${actionId}"`;
+    const buttonAt = html.indexOf(button);
+    if (buttonAt < 0) continue;
+    const articleAt = html.lastIndexOf('<article class="action-card ', buttonAt);
+    const divAt = html.indexOf('<div>', articleAt);
+    if (articleAt < 0 || divAt < 0 || divAt > buttonAt) continue;
+    html = `${html.slice(0, articleAt)}${html.slice(articleAt, divAt + 5)}${case02ActionArt(actionId)}${html.slice(divAt + 5)}`;
+    const classEnd = html.indexOf('"', articleAt + '<article class="'.length);
+    html = `${html.slice(0, classEnd)} action-${actionId.toLowerCase()}${html.slice(classEnd)}`;
+  }
+  return html;
 }
 
 export function renderCase02Result(state, result) {
@@ -65,6 +76,7 @@ function selectionComplete(actionId, options) {
   if (actionId === 'B05') return Boolean(options.mode);
   if (actionId === 'B06') return Boolean(options.scope);
   if (actionId === 'B09') return Boolean(options.intent);
+  if (['B10', 'B11', 'B12'].includes(actionId)) return Boolean(options.route);
   return true;
 }
 

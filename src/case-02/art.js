@@ -10,12 +10,17 @@ const scenes = Object.freeze({
   B07: '<circle class="paper" cx="133" cy="90" r="58"/><circle class="screen" cx="133" cy="90" r="30"/><path class="accent" d="M175 132l52 39M221 34v85M221 34l-18 18M221 34l18 18"/><path d="M70 158h181"/>',
   B08: '<path class="paper" d="M54 43h212v100H54z"/><path d="M76 67h79M76 87h60M76 107h79"/><path class="accent" d="M199 66q37 21 0 42M199 108l9-16-18 1"/><path d="M162 36v114"/>',
   B09: '<path class="screen" d="M50 34h220v112H50z"/><path class="paper" d="M78 57h164v66H78z"/><path class="accent" d="M119 88l25 25 56-60"/><path d="M35 164h250"/>',
+  B10: '<path class="paper" d="M35 39h74v105H35zM124 39h74v105h-74zM213 39h74v105h-74z"/><path class="accent" d="M72 83h52M198 83h15M72 144l39-29M161 144v-29M250 144l-39-29"/><path d="M50 61h44M139 61h44M228 61h44"/>',
+  B11: '<path class="screen" d="M40 35h240v112H40z"/><path class="paper" d="M58 57h62v65H58zM129 57h62v65h-62zM200 57h62v65h-62z"/><path class="accent" d="M74 91l12 12 23-30M145 91h30M216 79l30 30M246 79l-30 30"/>',
+  B12: '<path class="paper" d="M43 35h234v117H43z"/><path d="M64 58h91M64 80h70M64 102h91"/><path class="accent" d="M194 58h51v51h-51zM203 83l11 11 23-29"/><path class="danger" d="M181 132h78"/>',
 });
 
 const cast = Object.freeze({
   B01: ['資料龜', '欄位先講人話'], B02: ['分工貓', 'agent 不會讀心'], B03: ['合併狐', '三份真相排隊'],
   B04: ['客服鴿', '17:58 又來了'], B05: ['債務熊', '先還整合債'], B06: ['驗證犬', '跨源才算測過'],
   B07: ['追溯鼠', '這列從哪裡來'], B08: ['Context 蛙', '先喘一口再合併'], B09: ['交付鳥', '證據才是羽毛'],
+  B10: ['救援桌', '失敗不是只有再按一次'], B11: ['貪心鈕', '成功也要決定何時收手'],
+  B12: ['後果帳', '哪個坑就修哪個坑'],
 });
 
 function castFocus(actionId) {

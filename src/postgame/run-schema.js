@@ -1,10 +1,22 @@
 export const RUN_SCHEMA_VERSION = 'ai-engineer-game.run.v1';
-export const SUPPORTED_GAME_RULE_VERSIONS = Object.freeze(['case-01-narrative@2', 'case-02-csv@2', 'case-03-booking@1']);
+export const SUPPORTED_GAME_RULE_VERSIONS = Object.freeze([
+  'case-01-narrative@2',
+  'case-01-narrative@3',
+  'case-02-csv@2',
+  'case-02-csv@3',
+  'case-03-booking@1',
+  'case-03-booking@2',
+  'case-04-legacy@1',
+]);
 
 const RULE_CASE = Object.freeze({
   'case-01-narrative@2': 'case-01',
+  'case-01-narrative@3': 'case-01',
   'case-02-csv@2': 'case-02',
+  'case-02-csv@3': 'case-02',
   'case-03-booking@1': 'case-03',
+  'case-03-booking@2': 'case-03',
+  'case-04-legacy@1': 'case-04',
 });
 
 export const RUN_LIMITS = Object.freeze({

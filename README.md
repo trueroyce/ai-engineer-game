@@ -1,16 +1,10 @@
-# AI 工程接案遊戲
-
-三個可重玩的 AI 工程接案模擬案件，包含跨案職涯、工具卡融合、分支事件、模擬 sub-agent／NPC 協作，以及三案共用的本機 Claude 賽後教練。
-
-- 線上遊玩：https://trueroyce.github.io/ai-engineer-game/
-- 線上版是純靜態遊戲，不呼叫模型、不提供本機教練，也不探測 localhost。
-- 職涯只保存在同一瀏覽器、同一 profile、同一 origin 的 `localStorage`；進行中案件可在相同瀏覽器重新載入，沒有雲端同步或匯入／匯出職涯功能。
+# AI 工程接案遊戲（規則 v0.3-T3）
 
 ## 本機職涯擴充
 
-接案大廳現在可玩三案：案件 01「管好自己」保留原規則；案件 02「三張表格，一份真相」提供 CSV 契約、模擬 sub-agent 分工、整合債、需求變更、交叉測試與來源追溯；案件 03「大家都說只改一點點」提供客戶決策、設計師／工程師 NPC 協作、介面契約、合併、需求變更與證據重驗。agent 與 NPC 都是確定性的遊戲模擬，不是真多人或背景模型服務。
+接案大廳現在可玩四案：案件 01「管好自己」保留原規則；案件 02「三張表格，一份真相」提供 CSV 契約、模擬 sub-agent 分工、整合債、需求變更、交叉測試與來源追溯；案件 03「大家都說只改一點點」提供客戶決策、設計師／工程師 NPC 協作、介面契約、合併、需求變更與證據重驗；案件 04「昨天還好好的」在補丁、根因、局部重構與相容回滾間處理祖傳系統事故，回滾執行前必須先做資料相容／安全隔離決策，交付提案也要由客戶或產品負責人依公開局勢核准、退回補件或建議縮限。agent 與 NPC 都是確定性的遊戲模擬，不是真多人或背景模型服務，也不能代替負責人核准。
 
-職涯資料只保存在瀏覽器 `localStorage`。EXP、卡庫、融合等級與最多三張啟用卡跨案延續；Token、壓力與工作時間每次開案重設。三案都不會在遊玩過程啟動真模型、讀取外部 CSV 或連網。
+職涯資料只保存在瀏覽器 `localStorage`。EXP、卡庫、融合等級與最多三張啟用卡跨案延續；Token、壓力與工作時間每次開案重設。四案都不會在遊玩過程啟動真模型、讀取外部資料或連網。
 
 ```powershell
 npm start
@@ -26,14 +20,14 @@ GitHub Pages 只提供靜態遊戲，完全不顯示教練入口，也不會連�
 npm start -- 8081
 ```
 
-開啟 `http://127.0.0.1:8081/`，從大廳選任一案件。案件 01、02、03 結算後都可按「分析這局」；本機 loopback server 會先把該局公開紀錄保存到固定 `runs/`，再以非互動 Claude Code 呼叫本專案的三個唯讀 MCP 工具，講評直接回到網頁。功能沿用 Claude Code 的既有登入，不需要另填雲端 API key。
+開啟 `http://127.0.0.1:8081/`，從大廳選任一案件。案件 01、02、03、04 結算後都可按「分析這局」；本機 loopback server 會先把該局公開紀錄保存到固定 `runs/`，再以非互動 Claude Code 呼叫本專案的三個唯讀 MCP 工具，講評直接回到網頁。功能沿用 Claude Code 的既有登入，不需要另填雲端 API key。
 
 按下分析會使用 Claude 帳號額度，且公開遊戲紀錄會傳送給 Claude 服務；這不是離線分析。紀錄不含姓名、帳號、seed、事件權重、隱藏缺陷或完整引擎狀態。橋接停用 Claude 的 Bash、Read、Edit、Web 等內建工具，只載入固定的 `ai_game_runs` 唯讀 MCP，並限制單次執行、turn、估算預算、時間與輸出大小。登入失效、額度不足、MCP 連線失敗、逾時或取消都會顯示失敗，不會假稱完成，也不會自動重試消耗額度。
 
 同一伺服器程序中再次按一般分析會沿用已完成結果；只有按「重新分析（會再次使用額度）」才會再呼叫一次。手動 MCP 流程與資料界線詳見 `docs/mcp/README.md`。
 
-> **目前狀態：三案職涯公開版。**
-> 三案都有成功、部分成功、失敗、補救與止損路線；職涯包含起手三選一、兩次案內成長、跨案 EXP、卡庫、融合與最多三張啟用卡。
+> **保留經典第一版。**
+> `classic.html` 保留原本三案、18 回合、秘密缺陷與完整結算；根入口則是四案職涯版。完整開發規格與驗收紀錄保留在使用者本機，不納入整理後的公開 release。
 
 ## 需求
 
@@ -43,26 +37,19 @@ npm start -- 8081
 
 ## 啟動（離線）
 
-```powershell
-git clone https://github.com/trueroyce/ai-engineer-game.git
-cd ai-engineer-game
-```
-
-專案沒有第三方套件依賴，不需要執行 `npm install`。
-
 ```
 npm start
 ```
 
 終端機會印出 `http://127.0.0.1:8080/`，用瀏覽器開啟即可。要換埠號：`npm start -- 9000`（Windows PowerShell 亦同）。按 Ctrl+C 停止。
 
-根入口 `http://127.0.0.1:8080/` 是三案職涯大廳；`case-01.html`、`case-02.html`、`case-03.html` 是案件頁。遊戲內的 Claude Code、agent 與 NPC 都是模擬內容，不會在遊玩過程呼叫模型或執行工具。
+目前入口：職涯大廳在 `http://127.0.0.1:8080/`，可選案件 01–04；保留的完整 v1 在 `http://127.0.0.1:8080/classic.html`；敘事案件 01 直達頁在 `http://127.0.0.1:8080/case-01.html`。所有 CLI、agent、NPC 與工程過程都是遊戲模擬，不會在玩家電腦上執行真 CLI 或模型。
 
-職涯會保存完整進行中案件供同一瀏覽器重新載入；案件結算後會保存 EXP、卡庫、融合與各案裝備。經典第一案仍不保存進行中遊戲。案件結束後可把最小公開局紀錄存入本機 `runs/`，但局紀錄只供賽後教練唯讀分析，不能恢復職涯。
+保留的第一版不保存進行中的遊戲；職涯案件 01–04 則把完整 active run 寫入同一網址的瀏覽器 `localStorage`，刷新或關頁後會繼續同一局。案件結束後可把最小公開局紀錄存入本機 `runs/`，但該公開紀錄只供賽後教練唯讀分析，不能取代職涯存檔。
 
 ## 唯讀 MCP 賽後教練
 
-以 `npm start` 執行本機版時，案件 01、02、03 結束後都可按「存入本機賽後教練」，由同源 loopback server 直接把合法 `ai-engineer-game.run.v1` JSON 寫進固定 `runs/`。三案分別使用已知規則版 `case-01-narrative@2`、`case-02-csv@2`、`case-03-booking@1`；未知規則版或案件／規則不相符會被拒絕。檔案只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed、未揭露缺陷或完整引擎 state。本機 stdio MCP 可用三個唯讀工具 `list_runs`、`get_run`、`get_rules` 供既有 Claude Code 分析。
+以 `npm start` 執行本機版時，案件 01、02、03、04 結束後都可按「存入本機賽後教練」，由同源 loopback server 直接把合法 `ai-engineer-game.run.v1` JSON 寫進固定 `runs/`。四案分別使用已知規則版 `case-01-narrative@2`／`@3`、`case-02-csv@2`、`case-03-booking@1`、`case-04-legacy@1`；未知規則版或案件／規則不相符會被拒絕。檔案只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed、未揭露事件、骰序或完整引擎 state。本機 stdio MCP 可用三個唯讀工具 `list_runs`、`get_run`、`get_rules` 供既有 Claude Code 分析。
 
 唯讀 MCP server 本身不呼叫模型、不連網、不需 API key，也不能寫檔、刪檔或執行 shell；「只存到本機」也只經過窄寫入橋接，不會啟動 Claude。只有玩家明確按下「分析這局」時，一鍵分析 bridge 才會啟動受限的非互動 Claude Code，使用帳號額度讀取該局公開紀錄與三個唯讀 MCP 工具。完整安全邊界、真實協定測試與需人工核准的 project-scoped Claude Code 範本請見 `docs/mcp/README.md`。遊戲不會替使用者接受權限。
 
@@ -129,7 +116,6 @@ Edge 可執行 `node tests/browser/local-coach.browser.mjs --browser edge`。
 - `src/postgame/`、`src/local-coach/` 與 `src/mcp/`：最小公開局紀錄 schema／投影、本機固定 `runs/` 寫入橋接，以及固定 `runs/` 根的唯讀 stdio MCP。
 - `runs/`：本機遊戲結束後直接存入的局紀錄；`*.json` 不進 Git。
 - `tests/`：測試；`tests/golden/` 是由 canonical 試玩表抄錄的黃金重播資料；`tests/browser/` 是零依賴 CDP 瀏覽器驅動。
-- `docs/mcp/`：本機三案賽後教練安裝、安全、隱私與額度說明。
-- `docs/public/`：公開版本規格摘要、協作摘要與版本說明。
+- `docs/`：canonical 文件、決策紀錄、協作與測試紀錄。
 
 工具卡是遊戲虛構機制，不代表真實 Claude Code 功能。

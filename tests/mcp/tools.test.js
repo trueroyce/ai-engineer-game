@@ -7,7 +7,7 @@ import path from 'node:path';
 import { createRunStore } from '../../src/mcp/run-store.js';
 import { createToolService, TOOL_DEFINITIONS } from '../../src/mcp/tools.js';
 import { RUN_LIMITS } from '../../src/postgame/run-schema.js';
-import { syntheticCase02Run, syntheticCase03Run, syntheticRun, sha256 } from './fixtures.js';
+import { syntheticCase02Run, syntheticCase03Run, syntheticCase04Run, syntheticRun, sha256 } from './fixtures.js';
 
 async function fixture(t, record) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'aieg-mcp-tools-'));
@@ -49,11 +49,20 @@ test('list/get/rules return public evidence and keep injected text inert and byt
   const rules = payload(await service.call('get_rules', {}));
   assert.equal(rules.gameSchemaVersion, 'ai-engineer-game.run.v1');
   assert.match(rules.knowledgeBoundary, /不提供事件權重/);
-  assert.deepEqual(Object.keys(rules.publicRulesByCase).sort(), ['case-01', 'case-02', 'case-03']);
+  assert.deepEqual(Object.keys(rules.publicRulesByCase).sort(), ['case-01', 'case-02', 'case-03', 'case-04']);
+  assert.match(rules.publicRules.branching, /案件 01 @3/);
+  assert.deepEqual(rules.publicRulesByCase['case-01'].ruleVersions['case-01-narrative@2'].branchActions, []);
+  assert.deepEqual(rules.publicRulesByCase['case-01'].ruleVersions['case-01-narrative@3'].branchActions, ['A13', 'A14']);
+  assert.equal(rules.publicRulesByCase['case-01'].ruleVersions['case-01-narrative@3'].delayedConsequenceAfterMeaningfulWork, 2);
+  const case04Rules = rules.publicRulesByCase['case-04'].ruleVersions['case-04-legacy@1'];
+  assert.deepEqual(case04Rules.strategies, ['patch', 'investigate', 'refactor', 'rollback']);
+  assert.equal(case04Rules.rollbackCompatibilityDecisionRequired, true);
+  assert.equal(case04Rules.scopeApproval.agentMayApprove, false);
+  assert.deepEqual(case04Rules.scopeApproval.responses, ['approved', 'changes-requested']);
   assert.equal(sha256(await fs.readFile(file)), hash, 'read-only calls must not mutate fixture');
 });
 
-for (const record of [syntheticCase02Run(), syntheticCase03Run()]) {
+for (const record of [syntheticCase02Run(), syntheticCase03Run(), syntheticCase04Run()]) {
   test(`MCP lists and reads ${record.caseId} without changing the record`, async (t) => {
     const { service, file, hash } = await fixture(t, record);
     const listed = payload(await service.call('list_runs', {}));

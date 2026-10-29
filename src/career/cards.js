@@ -1,23 +1,41 @@
 import { CARDS as LEGACY_CARDS } from '../narrative/rules.js';
 
-export const CASE_IDS = Object.freeze(['case-01', 'case-02', 'case-03']);
+export const CASE_IDS = Object.freeze(['case-01', 'case-02', 'case-03', 'case-04']);
 
 const universal = new Set(['C1', 'C2', 'C3', 'C4', 'C5', 'C6']);
+const SPECIAL_ROUTE_TEXT = Object.freeze({
+  C4: '特殊救援：遇到可重現的整合問題時，可鎖住壞接點並保留可驗切片；問題仍須修復。',
+  C5: '資源交換：期限尚有餘裕時，可用一次休整換回 Token 並降低壓力。',
+  C7: '事故契約：裁決根因與責任邊界時少花 1 Token，並提高成功機會。',
+  C8: '特殊談判：已有決策紀錄時，可拿已確認範圍談換項；不會憑空產生核准。',
+  C9: '證據救援：測試失敗時，可補一個定向 fixture；未覆蓋範圍仍保留。',
+  C10: '資源交換：可用公開協調債換合併時間；債務會在後續 review 回來。',
+  C11: '特殊談判：把模糊 brief 整理成兩個可選方案；最後決策仍由客戶作。',
+  C12: '證據救援：交接失敗時可補來源清單；不能偽造遺失資料。',
+  C15: '特殊救援：可隔離衝突並保住未受影響證據；隔離不等於問題修好。',
+  C18: '成功取捨：可先公開邊界再安全改善，不會洩漏骰序或替玩家選答案。',
+});
+
+function withRouteText(card) {
+  const routeText = SPECIAL_ROUTE_TEXT[card.id];
+  return routeText ? { ...card, description: `${card.description} ${routeText}` } : card;
+}
+
 const normalizeLegacy = Object.fromEntries(Object.entries(LEGACY_CARDS).map(([id, card]) => [id, Object.freeze({
-  ...card,
-  cases: Object.freeze(universal.has(id) ? [...CASE_IDS] : ['case-02', 'case-03']),
+  ...withRouteText(card),
+  cases: Object.freeze(universal.has(id) ? [...CASE_IDS] : ['case-02', 'case-03', 'case-04']),
 })]));
 
 const NEW_CARDS = {
   C13: { id: 'C13', name: '需求翻譯器', rarity: 'overclock', drawWeight: 80, maxLevel: 2, description: 'Lv.1：每項工作的第一次付費重試，Token 成本降低 1（最低 1 Token），並額外取得 4 點理解。', upgradeDescription: 'Lv.2：額外理解提高為 6 點，並再少花 1 時間。', cases: [...CASE_IDS], effects: [{ type: 'retryLearning', amount: 4, fusedAmount: 6, tokenDiscount: 1, timeDiscountAt: 2 }] },
   C14: { id: 'C14', name: '機率超頻鈕', rarity: 'overclock', drawWeight: 70, maxLevel: 2, description: 'Lv.1：每局一次，差門檻 5 以內的失敗轉成有代價的部分成功。', upgradeDescription: 'Lv.2：每局可觸發兩次；仍會留下明示代價。', cases: [...CASE_IDS], effects: [{ type: 'nearMissPartial', margin: 5, uses: 1, fusedUses: 2 }] },
-  C15: { id: 'C15', name: 'Merge 防爆毯', rarity: 'overclock', drawWeight: 75, maxLevel: 2, description: 'Lv.1：每局第一次新增整合債或衝突時降低 1 級。', upgradeDescription: 'Lv.2：同時保留一份未被直接影響的證據。', cases: ['case-02', 'case-03'], effects: [{ type: 'integrationShield', amount: 1, preserveEvidenceAt: 2 }] },
+  C15: { id: 'C15', name: 'Merge 防爆毯', rarity: 'overclock', drawWeight: 75, maxLevel: 2, description: 'Lv.1：每局第一次新增整合債或衝突時降低 1 級。', upgradeDescription: 'Lv.2：同時保留一份未被直接影響的證據。', cases: ['case-02', 'case-03', 'case-04'], effects: [{ type: 'integrationShield', amount: 1, preserveEvidenceAt: 2 }] },
   C16: { id: 'C16', name: 'Token 反芻胃', rarity: 'overclock', drawWeight: 65, maxLevel: 2, description: 'Lv.1：單次工作花費至少 3 Token 時，每局返還一次 1 Token。', upgradeDescription: 'Lv.2：每局可返還兩次；成本不會低於 1。', cases: [...CASE_IDS], effects: [{ type: 'largeSpendRefund', threshold: 3, amount: 1, uses: 1, fusedUses: 2 }] },
-  C17: { id: 'C17', name: '續篇編劇', rarity: 'overclock', drawWeight: 75, maxLevel: 2, description: 'Lv.1：重遇同一失敗事件時增加 4 點補救理解。', upgradeDescription: 'Lv.2：續篇補救再少花 1 時間。', cases: ['case-02', 'case-03'], effects: [{ type: 'sequelRecovery', amount: 4, timeDiscountAt: 2 }] },
-  C18: { id: 'C18', name: '責任邊界雷達', rarity: 'overclock', drawWeight: 70, maxLevel: 2, description: 'Lv.1：契約／review 成功率 +8，並預告一個公開責任風險。', upgradeDescription: 'Lv.2：加成提高為 +12；重大變更可保留一份未直接受影響證據。', cases: ['case-02', 'case-03'], effects: [{ type: 'boundaryRadar', amount: 8, fusedAmount: 12, preserveEvidenceAt: 2 }] },
+  C17: { id: 'C17', name: '續篇編劇', rarity: 'overclock', drawWeight: 75, maxLevel: 2, description: 'Lv.1：重遇同一失敗事件時增加 4 點補救理解。', upgradeDescription: 'Lv.2：續篇補救再少花 1 時間。', cases: ['case-02', 'case-03', 'case-04'], effects: [{ type: 'sequelRecovery', amount: 4, timeDiscountAt: 2 }] },
+  C18: { id: 'C18', name: '責任邊界雷達', rarity: 'overclock', drawWeight: 70, maxLevel: 2, description: 'Lv.1：契約／review 成功率 +8，並預告一個公開責任風險。', upgradeDescription: 'Lv.2：加成提高為 +12；重大變更可保留一份未直接受影響證據。', cases: ['case-02', 'case-03', 'case-04'], effects: [{ type: 'boundaryRadar', amount: 8, fusedAmount: 12, preserveEvidenceAt: 2 }] },
 };
 
-export const CARDS = Object.freeze({ ...normalizeLegacy, ...Object.fromEntries(Object.entries(NEW_CARDS).map(([id, card]) => [id, Object.freeze({ ...card, cases: Object.freeze(card.cases), effects: Object.freeze(card.effects) })])) });
+export const CARDS = Object.freeze({ ...normalizeLegacy, ...Object.fromEntries(Object.entries(NEW_CARDS).map(([id, card]) => [id, Object.freeze({ ...withRouteText(card), cases: Object.freeze(card.cases), effects: Object.freeze(card.effects) })])) });
 export const STARTER_CARD_IDS = Object.freeze(['C1', 'C2', 'C3', 'C4', 'C5', 'C6']);
 export const MAX_FUSION_LEVEL = 2;
 export const MAX_CASE_LOADOUT = 3;

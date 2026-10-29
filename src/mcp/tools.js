@@ -1,6 +1,7 @@
 import { LIMITS } from '../narrative/rules.js';
 import { CASE02_LIMITS } from '../case-02/rules.js';
 import { CASE03_LIMITS } from '../case-03/rules.js';
+import { CASE04_LIMITS } from '../case-04/rules.js';
 import { RUN_LIMITS, RUN_SCHEMA_VERSION, SUPPORTED_GAME_RULE_VERSIONS } from '../postgame/run-schema.js';
 import { RunStoreError } from './run-store.js';
 
@@ -158,13 +159,30 @@ export function createToolService(store) {
             supportedGameRuleVersions: SUPPORTED_GAME_RULE_VERSIONS,
             publicRules: {
               resources: { initialToken: LIMITS.token, tokenCap: LIMITS.tokenCap, stressCap: LIMITS.stressCap, deadline: LIMITS.deadline, hardWork: LIMITS.hardWork },
+              branching: '案件 01 @3、案件 02／03／04 的失敗會開啟有成本的補救；關鍵成功可穩住、改善或承擔公開風險。延後後果只由玩家已作的決策觸發。舊案件 01 @2 進行中局不會套用 @3；其他舊規則進行中局也不會套用新分支。',
               cards: '開場三選一，約三分之一與三分之二進度各再三選一；同卡可融合。',
               ending: '主要交付層級由公開成果與證據決定；資源與歷程只改變尾聲。',
             },
             publicRulesByCase: {
-              'case-01': { focus: '需求、實作、驗證與證據', resources: { initialToken: LIMITS.token, tokenCap: LIMITS.tokenCap, stressCap: LIMITS.stressCap, deadline: LIMITS.deadline, hardWork: LIMITS.hardWork } },
+              'case-01': {
+                focus: '需求、實作、驗證與證據',
+                resources: { initialToken: LIMITS.token, tokenCap: LIMITS.tokenCap, stressCap: LIMITS.stressCap, deadline: LIMITS.deadline, hardWork: LIMITS.hardWork },
+                ruleVersions: {
+                  'case-01-narrative@2': {
+                    branchActions: [],
+                    delayedConsequenceAfterMeaningfulWork: null,
+                    note: '舊進行中局沿用原規則至結案，不會出現 A13／A14。',
+                  },
+                  'case-01-narrative@3': {
+                    branchActions: ['A13', 'A14'],
+                    delayedConsequenceAfterMeaningfulWork: 2,
+                    note: 'A07 結果後由 A13 選擇穩住、擴張或失敗補救；完成兩次後續工作後，A14 才處理該選擇留下的公開後果。',
+                  },
+                },
+              },
               'case-02': { focus: '三份 CSV 的資料契約、整合債務、跨源測試與來源追溯', resources: { initialToken: CASE02_LIMITS.token, tokenCap: CASE02_LIMITS.tokenCap, stressCap: CASE02_LIMITS.stressCap, deadline: CASE02_LIMITS.deadline } },
               'case-03': { focus: '客戶決策、NPC 協作、介面契約、merge、變更與目前 revision 證據', resources: { initialToken: CASE03_LIMITS.token, tokenCap: CASE03_LIMITS.tokenCap, stressCap: CASE03_LIMITS.stressCap, deadline: CASE03_LIMITS.deadline } },
+              'case-04': { focus: '舊系統除錯、回歸、資料相容、回滾／關功能、負責人核准與值班交接', resources: { initialToken: CASE04_LIMITS.token, tokenCap: CASE04_LIMITS.tokenCap, stressCap: CASE04_LIMITS.stressCap, deadline: CASE04_LIMITS.deadline }, ruleVersions: { 'case-04-legacy@1': { strategies: ['patch', 'investigate', 'refactor', 'rollback'], delayedConsequenceAfterMeaningfulWork: 2, scopeApproval: { owner: '客戶／產品負責人', boundToRevision: true, agentMayApprove: false, responses: ['approved', 'changes-requested'], publicReasons: true }, rollbackCompatibilityDecisionRequired: true, note: '補丁、根因、局部重構與相容回滾都保留公開代價；回滾須在執行前完成資料相容或安全隔離決策，負責人可依公開局勢核准、退回補件或建議縮限，模擬 agent 不能代簽。' } } },
             },
             knowledgeBoundary: '不提供事件權重、隨機 seed、內部 function truth、未揭露缺陷或未發生分支。',
             analysisGuide: analysisGuide(),

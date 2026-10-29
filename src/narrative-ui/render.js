@@ -29,6 +29,8 @@ const PURPOSES = Object.freeze({
   A10: '/context 用來檢視目前脈絡；/compact 才是壓縮脈絡，兩者不是同一招。',
   A11: '/rewind 回到舊狀態，Edit 與 Bash 則做最小修復與重驗。',
   A12: '讀取需求、產物、測試與已知問題，選擇事實允許的交付層級。',
+  A13: '把實作結果轉成明確承諾：成功後可穩住或擴張，失敗後可原型、砍範圍或硬做。',
+  A14: '處理先前承諾回頭找你的後果；只能解決對應問題，不會洗掉其他風險。',
 });
 
 export function renderIntro(setup) {
@@ -117,6 +119,8 @@ function optionControls(view, actionId, options) {
   const owns = (id) => view.tools.some((tool) => tool.id === id);
   const target = actionId === 'A07' ? `<label class="option-control decision-control"><span class="control-kicker">這會改變工作對象與這次工作結果</span><strong>這次處理哪個範圍？</strong><select data-option="target"><option value="persistence">保存與重新開啟</option><option value="core">新增、完成與刪除</option><option value="delete">單筆刪除</option></select></label>` : '';
   const repair = actionId === 'A11' ? `<label class="option-control decision-control"><strong>這次怎麼處理？</strong><select data-option="mode"><option value="fix" ${view.revisionOptions.canFixIssue ? '' : 'disabled'}>小範圍修復</option><option value="rollback" ${view.revisionOptions.canRollback ? '' : 'disabled'}>回到可用 checkpoint</option></select></label>` : '';
+  const routeChoices = view.storyChoices?.[actionId] ?? [];
+  const route = routeChoices.length ? `<label class="option-control decision-control"><span class="control-kicker">公開成本與後果</span><strong>這次要走哪條路？</strong><select data-option="route"><option value="">請選擇</option>${routeChoices.map((item) => `<option value="${esc(item.id)}">${esc(item.label)} — ${esc(item.detail)}</option>`).join('')}</select></label>` : '';
   const optional = [
     owns('C2') && ['A05', 'A07'].includes(actionId) ? '<label class="radio"><input type="checkbox" data-option-check="useC2"><span><strong>用快速原型省一點</strong><br><span class="muted">少花 Token，但合法不利分支會更有機會出現。</span></span></label>' : '',
     owns('C3') && ['A08', 'A09'].includes(actionId) ? '<label class="radio"><input type="checkbox" data-option-check="useC3"><span><strong>加做一次交叉檢查</strong><br><span class="muted">多花 1 Token，增加這次檢查覆蓋；它不會把舊結果變成新工作。</span></span></label>' : '',
@@ -126,7 +130,7 @@ function optionControls(view, actionId, options) {
     actionId === 'A10' && view.revisionOptions.canRefreshContext ? '<label class="radio revision-option"><input type="checkbox" data-option-check="repairDraft"><span><strong>依目前變更整理新摘要</strong></span></label>' : '',
     actionId === 'A11' && view.revisionOptions.canRepairNextIssue ? '<label class="radio revision-option"><input type="checkbox" data-option-check="repairDraft"><span><strong>修下一個仍開放的問題</strong></span></label>' : '',
   ].filter(Boolean).join('');
-  return `${target}${repair}${optional ? `<details class="work-options"><summary>調整這次做法</summary>${optional}</details>` : ''}`;
+  return `${target}${repair}${route}${optional ? `<details class="work-options"><summary>調整這次做法</summary>${optional}</details>` : ''}`;
 }
 
 export function renderPreview(view, actionId, options = {}, preview) {
@@ -136,7 +140,9 @@ export function renderPreview(view, actionId, options = {}, preview) {
     ? `你把大工程切成單一範圍；這次選的是「${{ persistence: '保存與重新開啟', core: '新增、完成與刪除', delete: '單筆刪除' }[options.target ?? 'persistence']}」。做完只代表這個範圍完成，證據仍要重跑。`
     : actionId === 'A11' && view.knownIssues.length
       ? `這次優先處理「${view.knownIssues[0]}」。目前共有 ${view.knownIssues.length} 個公開問題；結果會依本次實際關閉範圍逐項列出。修訂會產生新的付費嘗試。`
-      : scene.intro;
+      : ['A13', 'A14'].includes(actionId)
+        ? (view.storyChoices?.[actionId]?.find((item) => item.id === options.route)?.detail ?? '先選一條公開成本與後果都不同的路線。')
+        : scene.intro;
   const resolved = preview ?? { cached: false, cost: action.cost, overtime: false };
   const cachedNote = resolved.cached ? '<p class="notice"><strong>這個工作對象沒有改變。</strong>請回工作區免費查看上次結果；工具開關不能拿來重抽同一份內容。</p>' : '';
   const retryNote = !resolved.cached && (options.repairDraft || options.newRevision)
@@ -146,7 +152,7 @@ export function renderPreview(view, actionId, options = {}, preview) {
     .map((choice) => `<label class="radio${choice.available ? '' : ' unavailable'}"><input type="radio" name="intent" value="${choice.intent}" ${options.intent === choice.intent && choice.available ? 'checked' : ''} ${choice.available ? '' : 'disabled'}><span><strong>${esc(choice.label)}${choice.available ? '' : '（目前不可用）'}</strong><br><span class="muted">${esc(choice.detail)}</span></span></label>`)
     .join('')}</fieldset>` : '';
   const selectedDelivery = actionId !== 'A12' || view.deliveryChoices.some((choice) => choice.intent === options.intent && choice.available);
-  const confirmDisabled = (actionId === 'A12' && !selectedDelivery) || resolved.cached;
+  const confirmDisabled = (actionId === 'A12' && !selectedDelivery) || (['A13', 'A14'].includes(actionId) && !options.route) || resolved.cached;
   const costText = actionId === 'A12'
     ? '免費檢查與結案，不消耗 Token、工作時間或加班'
     : resolved.cached

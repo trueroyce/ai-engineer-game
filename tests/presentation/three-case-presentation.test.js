@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createCase02Game } from '../../src/case-02/engine-v2.js';
+import { createCase02Game, performCase02Action } from '../../src/case-02/engine-v2.js';
 import { case02ActionArt } from '../../src/case-02/art.js';
 import { renderCase02Board, renderCase02Ending, renderCase02Result } from '../../src/case-02/render-v2.js';
-import { createCase03Game } from '../../src/case-03/engine.js';
+import { createCase03Game, performCase03Action } from '../../src/case-03/engine.js';
 import { case03ActionArt } from '../../src/case-03/art.js';
 import { renderCase03Board, renderCase03Ending, renderCase03Result } from '../../src/case-03/render-v2.js';
 import { discoverLocalCoach, renderLocalCoachPanel } from '../../src/postgame/coach-ui.js';
 import { renderEndingFacets } from '../../src/presentation/ending-stage.js';
 
-test('case 02 board renders nine action-specific comic scenes instead of one repeated icon', () => {
+test('case 02 board renders nine base action-specific comic scenes instead of one repeated icon', () => {
   const html = renderCase02Board(createCase02Game({ templateId: 'balanced' }));
   for (let index = 1; index <= 9; index += 1) {
     assert.match(html, new RegExp(`action-b${String(index).padStart(2, '0')}`));
@@ -19,13 +19,30 @@ test('case 02 board renders nine action-specific comic scenes instead of one rep
   assert.match(html, /THREE SOURCES \/ ONE TRUTH/);
 });
 
-test('case 03 board renders eight distinct client/NPC/contract scenes', () => {
+test('case 03 board renders eight base client/NPC/contract scenes', () => {
   const html = renderCase03Board(createCase03Game({ templateId: 'balanced' }));
   for (let index = 1; index <= 8; index += 1) {
     assert.match(html, new RegExp(`action-c${String(index).padStart(2, '0')}`));
   }
   assert.equal((html.match(/case03-art/g) ?? []).length, 8);
   assert.match(html, /CLIENT → DESIGN → ENGINEERING/);
+});
+
+test('story route cards appear only when the current public state opens them', () => {
+  const initial02 = createCase02Game({ templateId: 'beginner', eventRolls: [100, 1] });
+  assert.doesNotMatch(renderCase02Board(initial02), /data-case02-action="B10"/);
+  const failed02 = performCase02Action(initial02, 'B01', {
+    idPolicy: 'canonical-map', datePolicy: 'normalize-iso', duplicatePolicy: 'latest-export',
+    operationId: 'ui-route-02', stateVersion: initial02.stateVersion,
+  }).state;
+  assert.match(renderCase02Board(failed02), /data-case02-action="B10"/);
+
+  const initial03 = createCase03Game({ templateId: 'beginner', eventRolls: [100, 1] });
+  assert.doesNotMatch(renderCase03Board(initial03), /data-case03-action="C09"/);
+  const failed03 = performCase03Action(initial03, 'C01', {
+    scope: 'full', operationId: 'ui-route-03', stateVersion: initial03.stateVersion,
+  }).state;
+  assert.match(renderCase03Board(failed03), /data-case03-action="C09"/);
 });
 
 test('case 02 and 03 action art carries named dialogue and three explicit outcome directions', () => {

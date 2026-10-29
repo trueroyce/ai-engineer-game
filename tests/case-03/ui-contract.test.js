@@ -19,9 +19,10 @@ test('所有需要決策的工作均從空選擇開始，確認鈕依選擇停�
   assert.doesNotMatch(main, /scope: 'full'|intent: 'verified'|strategy: 'pair'/);
 });
 
-test('大廳把三案標為可玩且進階不是門鎖', async () => {
+test('大廳把四案標為可玩且進階不是門鎖', async () => {
   const source = await read('src/career/main.js');
   assert.match(source, /'03': \{ available: true/);
   assert.match(source, /case-03\.html\?mode=career/);
+  assert.match(source, /case-04\.html\?mode=career/);
   assert.match(source, /進階」只是提示，不是門鎖/);
 });

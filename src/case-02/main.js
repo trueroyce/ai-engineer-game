@@ -52,6 +52,7 @@ function defaults(actionId) {
   if (actionId === 'B05') return { mode: '' };
   if (actionId === 'B06') return { scope: '' };
   if (actionId === 'B09') return { intent: '' };
+  if (['B10', 'B11', 'B12'].includes(actionId)) return { route: '' };
   return {};
 }
 

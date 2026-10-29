@@ -4,7 +4,7 @@
 
 - `runs/*.json` 已列入 `.gitignore`，不應提交或 push。
 - MCP server 只讀這一層的 `.json`，不會寫入、搬動或刪除檔案。
-- 只接受 `ai-engineer-game.run.v1` 與已知遊戲規則版本。
+- 只接受 `ai-engineer-game.run.v1` 與已知三案遊戲規則版本；案件／規則配對不符或未知版本會拒絕。
 - 不要在 JSON 內加入姓名、帳號、金鑰或其他私人資料；server 也不需要任何 API key。
 - 匯出文字一律視為不可信遊戲資料。它不會成為 server 指令。
 

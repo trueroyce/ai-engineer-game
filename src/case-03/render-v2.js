@@ -3,6 +3,7 @@ import { cardIllustration } from '../narrative-ui/art.js';
 import { renderLocalCoachPanel } from '../postgame/coach-ui.js';
 import { renderEndingStage } from '../presentation/ending-stage.js';
 import { case03ActionArt, case03EndingArt, case03StatusArt, case03Tone } from './art.js';
+import { CASE03_ACTIONS } from './rules.js';
 
 export const renderCase03Error = legacy.renderCase03Error;
 const shell = (content) => `<div class="topbar"><span class="brand">AI 工程接案遊戲 · CASE 03</span><a class="button secondary" href="./index.html">回到接案大廳</a></div>${content}`;
@@ -14,12 +15,21 @@ export function renderCase03Intro(career) {
 export function renderCase03Board(state, message = '') {
   let html = legacy.renderCase03Board(state, message);
   html = html.replace('<section class="panel">', `<section class="panel case-workspace">${case03StatusArt(state)}`);
-  const actionIds = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08'];
-  let index = 0;
-  return html.replace(/<article class="action-card ([^"]*)"><div><span class="mark">/g, (match, classes) => {
-    const actionId = actionIds[index++] ?? 'C01';
-    return `<article class="action-card action-${actionId.toLowerCase()} ${classes}"><div>${case03ActionArt(actionId)}<span class="mark">`;
-  });
+  const story = state.story;
+  const pending = Object.values(story?.commitments ?? {}).filter((value) => value === 'pending' || value === 'surfaced').length;
+  const strip = `<div class="story-strip"><strong>剛才的選擇留下什麼</strong><span>${story?.openRecovery ? '失敗開出新路' : story?.openOpportunity ? '成功後可穩住或加碼' : pending ? `${pending} 個承諾會在後續回來` : '目前沒有未處理的故事承諾'}</span></div>`;
+  html = html.replace('<div class="action-grid">', `${strip}<div class="action-grid">`);
+  for (const actionId of Object.keys(CASE03_ACTIONS)) {
+    const buttonAt = html.indexOf(`data-case03-action="${actionId}"`);
+    if (buttonAt < 0) continue;
+    const articleAt = html.lastIndexOf('<article class="action-card ', buttonAt);
+    const divAt = html.indexOf('<div>', articleAt);
+    if (articleAt < 0 || divAt < 0 || divAt > buttonAt) continue;
+    html = `${html.slice(0, articleAt)}${html.slice(articleAt, divAt + 5)}${case03ActionArt(actionId)}${html.slice(divAt + 5)}`;
+    const classEnd = html.indexOf('"', articleAt + '<article class="'.length);
+    html = `${html.slice(0, classEnd)} action-${actionId.toLowerCase()}${html.slice(classEnd)}`;
+  }
+  return html;
 }
 
 export function renderCase03Preview(state, actionId, options) {

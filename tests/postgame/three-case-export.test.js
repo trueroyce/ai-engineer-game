@@ -45,8 +45,8 @@ function completedCase03() {
 }
 
 for (const [caseId, createState, prefix, ruleVersion] of [
-  ['case-02', completedCase02, 'case02-', 'case-02-csv@2'],
-  ['case-03', completedCase03, 'case03-', 'case-03-booking@1'],
+  ['case-02', completedCase02, 'case02-', 'case-02-csv@3'],
+  ['case-03', completedCase03, 'case03-', 'case-03-booking@2'],
 ]) {
   test(`${caseId} exports a deterministic validated public-only run`, () => {
     const state = createState();
@@ -75,4 +75,14 @@ test('export refuses active games and the schema refuses a mismatched case/rule 
   const record = buildCareerCaseRunRecord(completedCase02());
   record.gameRuleVersion = 'case-03-booking@1';
   assert.throws(() => validateRunRecord(record), /do not match/);
+});
+
+test('run schema keeps reading phase-29 case-02 and case-03 rule versions', () => {
+  const case02 = buildCareerCaseRunRecord(completedCase02());
+  case02.gameRuleVersion = 'case-02-csv@2';
+  assert.equal(validateRunRecord(case02), case02);
+
+  const case03 = buildCareerCaseRunRecord(completedCase03());
+  case03.gameRuleVersion = 'case-03-booking@1';
+  assert.equal(validateRunRecord(case03), case03);
 });

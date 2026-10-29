@@ -1,4 +1,4 @@
-export const CASE03_RULE_VERSION = 'case-03-booking@1';
+export const CASE03_RULE_VERSION = 'case-03-booking@2';
 
 export const CASE03_LIMITS = Object.freeze({ token: 18, tokenCap: 24, stressCap: 10, deadline: 12 });
 
@@ -11,6 +11,9 @@ export const CASE03_ACTIONS = Object.freeze({
   C06: { id: 'C06', title: '重跑預約回歸與追溯', tutorial: '每次介面或需求 revision 改變，舊證據就失效；測試不是護身符刺青。' },
   C08: { id: 'C08', title: '修復合併債與失效證據', tutorial: '失敗不會鎖死；付出新成本，取得下一個事件，再把狀態修回可交付。' },
   C07: { id: 'C07', title: '交付、有限試用或止損', tutorial: '依目前公開證據選擇結案方式；不會把缺口改名成成功。' },
+  C09: { id: 'C09', title: '失敗後改走原型、縮限或救援', tutorial: '不用只按原動作重骰；補救會留下不同範圍、責任與後續成本。' },
+  C10: { id: 'C10', title: '成功後鎖住成果或繼續加碼', tutorial: '穩定切片、品質改善與貪心擴張會改變後續需求與證據。' },
+  C11: { id: 'C11', title: '處理延後回來的責任與接口', tutorial: '決策問題、介面問題各自處理；隔離可保住切片，但不會假裝已修復。' },
 });
 
 export const CASE03_REWARD_ID = 'case-03:reward:handoff-kit';

@@ -2,6 +2,7 @@ import { TEMPLATES } from '../narrative/rules.js';
 import { CARDS } from '../career/cards.js';
 import { CASE03_ACTIONS, STRATEGIES } from './rules.js';
 import { case03PublicView, previewCase03Action } from './engine.js';
+import { case03ConsequenceChoices, case03OpportunityChoices, case03RecoveryChoices } from './story.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 const shell = (body) => `<div class="topbar"><span class="brand">AI 工程接案遊戲 · CASE 03</span><a class="button secondary" href="./index.html" aria-label="返回接案大廳">返回接案大廳</a></div>${body}`;
@@ -23,6 +24,9 @@ export function renderCase03Intro(career) {
 }
 
 function reason(state, id) {
+  if (id === 'C09' && !state.story?.openRecovery) return '失敗或部分成功後才會開啟';
+  if (id === 'C10' && !state.story?.openOpportunity) return '關鍵成功後才會開啟';
+  if (id === 'C11' && !case03ConsequenceChoices(state).length) return '延後責任或接口問題浮現後才需要處理';
   if (id === 'C02' && !state.requirements) return '先處理需求';
   if (id === 'C03' && !state.contract?.approved) return '等待客戶核准';
   if (id === 'C04' && !state.implementation?.complete) return '先完成實作';
@@ -35,16 +39,21 @@ function reason(state, id) {
 export function renderCase03Board(state, message = '') {
   const view = case03PublicView(state);
   const cards = view.cards.filter((card) => card.equipped).map((card) => `<span class="tag">${esc(card.name)} Lv.${card.level}</span>`).join('') || '<span class="tag">未裝備卡</span>';
-  const actions = Object.values(CASE03_ACTIONS).map((action, index) => {
+  const actions = Object.values(CASE03_ACTIONS)
+    .filter((action) => !['C09', 'C10', 'C11'].includes(action.id) || !reason(state, action.id))
+    .map((action, index) => {
     const locked = reason(state, action.id);
     return `<article class="action-card ${locked ? 'locked' : ''}"><div><span class="mark">${String(index + 1).padStart(2, '0')}</span><h3>${esc(action.title)}</h3><p>${esc(action.tutorial)}</p></div><button data-case03-action="${action.id}" ${locked ? 'disabled' : ''}>${locked || '查看成本與選項'}</button></article>`;
-  }).join('');
+    }).join('');
   return shell(`${hud(view)}${message ? `<p class="notice" role="status">${esc(message)}</p>` : ''}<div class="layout"><section class="panel"><div class="eyebrow">artifact revision ${view.artifactRevision}</div><h1>今天要協調哪一團？</h1><p>啟用工具：${cards}</p><div class="action-grid">${actions}</div></section><aside class="panel"><h2>公開狀態</h2><ul class="status-list"><li><strong>需求：</strong>${view.requirements?.clear ? '已收斂' : view.requirements ? '仍有矛盾' : '未處理'}</li><li><strong>契約：</strong>${view.contract?.approved ? '客戶已核准' : '未核准'}</li><li><strong>分工：</strong>${esc(view.implementation?.strategy ?? '未安排')}</li><li><strong>合併債：</strong>${view.integrationDebt}</li><li><strong>變更：</strong>${view.change.handled ? '已簽入契約' : view.change.announced ? '仍未決' : '尚未出現'}</li><li><strong>證據：</strong>${view.evidence.revision === view.artifactRevision ? `目前版 ${view.evidence.coverage}/4` : '尚未重驗目前版'}</li></ul><h3>正式交付缺口</h3>${view.blockers.length ? `<ul class="check-list">${view.blockers.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>` : '<p class="notice good">全部公開條件已對齊。</p>'}<details><summary>這是真多人或真 agent 嗎？</summary><p>不是。角色、分工、事件與工具名稱都是遊戲內模擬，不會連線或花模型費用。</p></details></aside></div>`);
 }
 
 const radio = (name, value, selected, title, detail, disabled = false) => `<label class="radio ${disabled ? 'locked' : ''}"><input type="radio" name="${name}" value="${value}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span><strong>${esc(title)}</strong><br><small>${esc(detail)}</small></span></label>`;
 
 function controls(state, actionId, options, view) {
+  if (actionId === 'C09') return `<div class="radio-list">${case03RecoveryChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
+  if (actionId === 'C10') return `<div class="radio-list">${case03OpportunityChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
+  if (actionId === 'C11') return `<div class="radio-list">${case03ConsequenceChoices(state).map((item) => radio('route', item.id, options.route === item.id, item.label, item.detail)).join('')}</div>`;
   if (actionId === 'C01') return `<div class="radio-list">${radio('scope', 'core', options.scope === 'core', '先收斂核心預約', '較省 Token／時間，但不含完整借用與取消責任，只能有限交付。')}${radio('scope', 'full', options.scope === 'full', '納入借用、取消與衝突', '多 1 Token、1 時間並承擔完整驗收責任，可走正式交付。')}</div>`;
   if (actionId === 'C02') return `<div class="radio-list">${radio('policy', 'explicit', options.policy === 'explicit', '客戶逐項核准', '較穩但需要明確回答。')}${radio('policy', 'async', options.policy === 'async', '留言核准整份契約', '較快，仍必須由客戶本人決定。')}</div>`;
   if (actionId === 'C03') return `<div class="radio-list">${Object.entries(STRATEGIES).map(([id, item]) => radio('strategy', id, options.strategy === id, item.label, `${item.token} Token／${item.time} 時間／基礎債 ${item.debt}`)).join('')}</div>`;
@@ -56,7 +65,7 @@ function controls(state, actionId, options, view) {
 }
 
 function complete(actionId, options) {
-  const key = { C01: 'scope', C02: 'policy', C03: 'strategy', C04: 'mergeMode', C05: 'response', C06: 'scope', C07: 'intent' }[actionId];
+  const key = { C01: 'scope', C02: 'policy', C03: 'strategy', C04: 'mergeMode', C05: 'response', C06: 'scope', C07: 'intent', C09: 'route', C10: 'route', C11: 'route' }[actionId];
   return key ? Boolean(options[key]) : true;
 }
 

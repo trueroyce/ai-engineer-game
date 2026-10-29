@@ -26,8 +26,8 @@ async function run(page, base) {
   await page.goto(base);
   await page.click('[data-template="balanced"]');
   await page.click('[data-create]');
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
-  check('lobby', '三案都可開始且進階不硬鎖', (await page.eval('document.querySelectorAll(".project-start").length')) === 3);
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
+  check('lobby', '四案都可開始且進階不硬鎖', (await page.eval('document.querySelectorAll(".project-start").length')) === 4);
   await page.click('.project:nth-child(3) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
   const intro = await page.text();
@@ -63,7 +63,7 @@ async function run(page, base) {
   await shot(page, '02-ending');
 
   await page.click('[data-return-lobby]');
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
   await page.setViewport(390, 844, true);
   const mobile = await page.eval('({ width: document.documentElement.scrollWidth, viewport: innerWidth, heights: [...document.querySelectorAll(".project-start")].map((e) => e.getBoundingClientRect().height) })');
   check('mobile', '390px 無水平溢位且入口可觸控', mobile.width <= mobile.viewport && mobile.heights.every((height) => height >= 44), JSON.stringify(mobile));

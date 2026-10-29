@@ -48,14 +48,14 @@ async function run(page, base) {
   await page.goto(base);
   await page.click('[data-template="balanced"]');
   await page.click('[data-create]');
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
   const lobby = await page.eval(`({
     starts: document.querySelectorAll('.project-start').length,
     preparing: document.querySelectorAll('.project.preparing').length,
     case02: document.querySelector('.project:nth-child(2) .project-start')?.getAttribute('href'),
     text: document.querySelector('#app').innerText
   })`);
-  check('lobby', '案件 01/02/03 皆可玩', lobby.starts === 3 && lobby.preparing === 0 && lobby.case02?.includes('case-02.html'), JSON.stringify(lobby));
+  check('lobby', '案件 01/02/03/04 皆可玩', lobby.starts === 4 && lobby.preparing === 0 && lobby.case02?.includes('case-02.html'), JSON.stringify(lobby));
 
   await page.click('.project:nth-child(2) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
@@ -108,7 +108,7 @@ async function run(page, base) {
   await shot(page, '02-verified-ending');
 
   await page.click('[data-return-lobby]');
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
   check('return', '完成後回大廳並顯示案 2 次數', (await page.text()).includes('已完成 1 次'));
 
   await page.setViewport(390, 844, true);

@@ -28,8 +28,26 @@ test('v1 migration preserves cards, ledger and creates per-case applicable loado
   assert.deepEqual(migrated.loadoutsByCase['case-01'], ['C1']);
   assert.deepEqual(migrated.loadoutsByCase['case-02'], ['C1', 'C7']);
   assert.deepEqual(migrated.loadoutsByCase['case-03'], ['C1', 'C7']);
+  assert.deepEqual(migrated.loadoutsByCase['case-04'], ['C1', 'C7']);
   assert.deepEqual(migrated.rewardLedger, ['case-01:final_delivery']);
   assert.equal(migrated.starterSelection.status, 'completed');
+});
+
+test('three-case career v2 is upgraded in memory with an empty case 04 loadout without losing data', () => {
+  const career = createCareer({ careerId: 'career-three-case', templateId: 'balanced', now: '2026-10-28T00:00:00.000Z' });
+  career.cards = { C1: 2 };
+  career.loadoutsByCase['case-01'] = ['C1'];
+  career.loadoutsByCase['case-02'] = ['C1'];
+  career.loadoutsByCase['case-03'] = ['C1'];
+  delete career.loadoutsByCase['case-04'];
+  career.exp = 9; career.level = 3; career.rewardLedger = ['old-ledger'];
+  const decoded = decodeCareer(JSON.stringify({ schemaVersion: CAREER_STORAGE_KEY, savedAt: '2026-10-28T00:00:00.000Z', career }));
+  assert.equal(decoded.status, 'ready');
+  assert.equal(decoded.upgraded, true);
+  assert.deepEqual(decoded.career.loadoutsByCase['case-04'], []);
+  assert.equal(decoded.career.exp, 9);
+  assert.deepEqual(decoded.career.rewardLedger, ['old-ledger']);
+  assert.deepEqual(decoded.career.loadoutsByCase['case-01'], ['C1']);
 });
 
 test('empty legacy career gets exactly one starter selection while repeated selection is idempotent', () => {

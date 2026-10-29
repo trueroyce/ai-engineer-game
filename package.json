@@ -1,8 +1,8 @@
 {
   "name": "ai-engineer-game",
-  "version": "3.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "三案職涯、跨案卡片成長、分支事件與本機三案 Claude 賽後教練的 AI 工程接案遊戲。",
+  "description": "AI 工程接案遊戲（規則 v0.3-T3），瀏覽器單機版；零依賴、可離線啟動。",
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
@@ -14,6 +14,7 @@
     "test:browser:career": "node tests/browser/redesign.browser.mjs --browser chrome",
     "test:browser:case-02": "node tests/browser/redesign.browser.mjs --browser chrome",
     "test:browser:case-03": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:case-04": "node tests/browser/case-04.browser.mjs --browser chrome",
     "test:browser:redesign": "node tests/browser/redesign.browser.mjs --browser chrome",
     "test:browser:natural": "node tests/browser/natural-play.browser.mjs --browser chrome",
     "test:mcp": "node --test tests/mcp/*.test.js tests/narrative/run-export.test.js",

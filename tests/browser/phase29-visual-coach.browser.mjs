@@ -62,7 +62,7 @@ async function freshCareer(page, base) {
   await page.click('[data-create]');
   await page.waitFor('document.querySelectorAll("[data-starter-card]").length === 3');
   await page.click('[data-starter-card]');
-  await page.waitFor('document.querySelectorAll(".project-start").length === 3');
+  await page.waitFor('document.querySelectorAll(".project-start").length === 4');
 }
 
 async function saveAndAnalyze(page, expectedPrefix) {
