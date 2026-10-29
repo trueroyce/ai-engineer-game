@@ -4,11 +4,19 @@ import { applyIntegrationShield, applySpendRefund } from '../career/card-runtime
 import { initializeCaseAttempts, previewCaseAttempt, reviseCaseAttempts, runCaseAttempt } from '../core/case-attempt.js';
 import { composeEndingFacets } from '../core/ending-facets.js';
 import * as legacy from './engine.js';
-import { CASE02_LIMITS, CASE02_REWARD_ID, CASE02_REWARD_POOL, NORMALIZATION_STRATEGIES } from './rules.js';
+import { CASE02_LIMITS, CASE02_REWARD_ID, CASE02_REWARD_POOL, CASE02_RULE_VERSION, NORMALIZATION_STRATEGIES } from './rules.js';
+import {
+  case02StoryBlockers,
+  normalizeCase02Story,
+  observeCase02Story,
+  performCase02StoryAction,
+  previewCase02StoryAction,
+} from './story.js';
 
 const clone = (value) => structuredClone(value);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const level = (state, id) => state.equipped.includes(id) ? (state.cards[id] ?? 0) : 0;
+const usesCase02Story = (state) => state.ruleVersion === CASE02_RULE_VERSION;
 const FAILURE_EVENTS = Object.freeze({
   B01: [{ id: 'latest-means-what', weight: 55 }, { id: 'id-alias-parade', weight: 45 }],
   B02: [{ id: 'leading-zero-snack', weight: 50 }, { id: 'brief-drift', weight: 50 }],
@@ -72,6 +80,9 @@ function eventResult(title, summary, player, response, followUp, consequence, ou
 
 function publicBlockers(state) {
   const blockers = [...legacy.case02PublicView(state).blockers];
+  if (usesCase02Story(state)) {
+    for (const blocker of case02StoryBlockers(state)) if (!blockers.includes(blocker)) blockers.push(blocker);
+  }
   if (state.contract && state.contract.clarity === false && !blockers.includes('契約仍有一句話各自解讀')) blockers.unshift('契約仍有一句話各自解讀');
   return blockers;
 }
@@ -111,11 +122,16 @@ export function createCase02Game(options = {}) {
   state.operationPayloads = {};
   state.rewardFallback = null;
   state.cardUsage = {};
+  state.story = normalizeCase02Story();
   initializeCaseAttempts(state);
   return state;
 }
 
 export function previewCase02Action(state, actionId, options = {}) {
+  if (['B10', 'B11', 'B12'].includes(actionId)) {
+    if (!usesCase02Story(state)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    return previewCase02StoryAction({ ...state, story: normalizeCase02Story(state.story) }, actionId, options);
+  }
   const legacyOptions = stripV2Options(actionId, options);
   const base = legacy.previewCase02Action(state, actionId, legacyOptions);
   if (actionId === 'B01') return withAttemptPreview(state, { ...base, token: Math.max(1, base.token - level(state, 'C7')) }, actionId, 'A', 40, level(state, 'C7') * 10);
@@ -173,6 +189,28 @@ export function performCase02Action(original, actionId, raw = {}) {
     return { state: clone(original), result: clone(original.operationResults[operationId]), cached: true };
   }
   if (raw.stateVersion !== original.stateVersion) throw new Error('畫面已更新，請重新確認這一步');
+  if (['B10', 'B11', 'B12'].includes(actionId)) {
+    if (!usesCase02Story(original)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    if (original.phase !== 'playing') throw new Error('案件已結束');
+    if (original.pendingReward) throw new Error('請先處理目前的職涯獎勵');
+    const state = clone(original);
+    state.story = normalizeCase02Story(state.story);
+    state.operationPayloads ??= {};
+    if (actionId === 'B10' && !state.story.openRecovery) throw new Error('目前沒有待處理的失敗岔路');
+    if (actionId === 'B11' && !state.story.openOpportunity) throw new Error('目前沒有待處理的成功誘惑');
+    const output = performCase02StoryAction(state, actionId, raw);
+    state.stateVersion += 1;
+    state.log.push({
+      actionId,
+      options: { route: raw.route },
+      outcome: output.result.outcome,
+      resources: { token: state.token, stress: state.stress, time: state.timeLeft },
+      dataRevision: state.dataRevision,
+    });
+    state.operationPayloads[operationId] = payload;
+    state.operationResults[operationId] = clone(output.result);
+    return { state, result: output.result, cached: false };
+  }
   if (actionId === 'B09' && raw.intent === 'verified') {
     const blockers = publicBlockers(original);
     if (blockers.length) throw new Error(`尚未符合正式交付：${blockers.join('；')}`);
@@ -252,6 +290,10 @@ export function performCase02Action(original, actionId, raw = {}) {
       result = eventResult('修到一半，mapping 又長出一個別名', '本次修復未完成；整合債保持，資源不退。', '你追 customer_id 與 client_no 的對照。', '第三個歷史代號從封存信件裡探頭。', '可以付費重試，或誠實止損。', '失敗沒有改寫資料 revision。', 'repair-failed');
     } else {
       state.contract.clarity = true;
+      if (usesCase02Story(state)) {
+        state.change = clone(original.change);
+        state.destructiveCleanup = Boolean(original.destructiveCleanup);
+      }
       result = eventResult('mapping 修回來，世界暫時只有一個 customer_id', '契約、mapping 與退款規則已對齊。', '你依來源修正契約與 mapping。', '除錯完成，沒有拿刪資料祭天。', '資料已改版，請重跑測試與追溯。', '可恢復正式交付路線。', 'repaired');
     }
   } else if (actionId === 'B06') {
@@ -307,6 +349,7 @@ export function performCase02Action(original, actionId, raw = {}) {
     }
   }
   if (spendRefund && result.process) result.process.consequence += ` Token 反芻胃返還 ${spendRefund} Token（本局次數有上限）。`;
+  if (usesCase02Story(state)) observeCase02Story(state, actionId, raw, result);
   if (actionId === 'B01' && state.lastAttempt?.outcome === 'success') state.preIntegrationDebt = 0;
   if (state.ending) state.ending.playFacets = composeEndingFacets(state);
 
@@ -323,6 +366,7 @@ export function chooseCase02Reward(original, cardId) {
 
 export function case02PublicView(state) {
   const view = legacy.case02PublicView(state);
+  if (usesCase02Story(state)) view.story = normalizeCase02Story(state.story);
   view.rewardFallback = clone(state.rewardFallback ?? null);
   view.progression = state.progression ? { runExp: state.progression.runExp, progressKeys: [...state.progression.progressKeys], rewardMilestones: state.progression.rewardMilestones.map((item) => ({ slot: item.slot, status: item.status })) } : null;
   view.blockers = publicBlockers(state);

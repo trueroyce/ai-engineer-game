@@ -1,5 +1,6 @@
 import { ACTIONS, CARDS, LIMITS } from './rules.js';
 import { availableActions, isActionResultCurrent, previewDelivery, readPreviousActionResult, safeForTrial, upgradeChoices } from './engine.js';
+import { case01StoryChoices, normalizeCase01Story } from './story.js';
 
 const REQUIREMENT_LABELS = Object.freeze({
   R1: '新增項目', R2: '完成與未完成切換', R3: '單筆刪除正確',
@@ -17,6 +18,8 @@ function presentedTitle(state, action) {
 function actionHint(state, actionId, hasPrevious) {
   if (actionId === 'A01' && state.resolvedKeyByAction.A01 && state.requirement.clarity !== 'clear') return '這是可略過的補救工作；不重問也能繼續，但歧義會跟著後續實作。';
   if (actionId === 'A07') return '選定工作後再挑實作範圍；不同範圍是不同工作。';
+  if (actionId === 'A13') return '這不是結局標籤：選擇會改變範圍，並在兩次後續工作後回來找你。';
+  if (actionId === 'A14') return '只處理先前選擇造成的後果，不會順便清掉其他問題。';
   if (!hasPrevious) return '';
   if (actionId === 'A04' && state.documents.wrongCompletionRule) return '需求文件有已知誤解，可用新修訂訂正後再確認。';
   if (actionId === 'A06') return '新問題是新工作；查看舊畫面回饋不會扣資源。';
@@ -99,12 +102,15 @@ export function projectNarrativeView(state) {
     pendingUpgrade: state.pendingUpgrades.length ? { threshold: state.pendingUpgrades[0], choices: upgradeChoices(state) } : null,
     xp: state.xp,
     ending: state.ending ? structuredClone(state.ending) : null,
+    story: normalizeCase01Story(state.story),
+    storyChoices: Object.fromEntries(['A13', 'A14'].map((id) => [id, case01StoryChoices(state, id)])),
   };
 }
 
 export function actionOptionsForNewWork(state, actionId) {
   const saved = readPreviousActionResult(state, actionId);
   const options = saved?.semanticOptions ? structuredClone(saved.semanticOptions) : {};
+  if (['A13', 'A14'].includes(actionId)) return {};
   if (actionId !== 'A11') return options;
 
   const hasOpenIssue = state.knownIssues.some((issue) => issue.status !== 'fixed');

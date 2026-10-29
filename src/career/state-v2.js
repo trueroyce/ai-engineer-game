@@ -14,9 +14,10 @@ const CASE_REWARDS = Object.freeze({
   'case-01': Object.freeze({ requirements_clear: 1, confirmed_spec: 1, working_core: 1, persistence_correct: 1, full_verification: 1, limited_trial: 1, final_delivery: 2 }),
   'case-02': Object.freeze({ contract_aligned: 1, sources_normalized: 1, truth_reconciled: 1, change_contracted: 1, cross_source_tests: 1, audit_trace: 1, verified_delivery: 2 }),
   'case-03': Object.freeze({ requirements_decided: 1, interface_approved: 1, implementation_complete: 1, merge_reviewed: 1, change_contracted: 1, current_evidence: 1, verified_delivery: 2 }),
+  'case-04': Object.freeze({ incident_scoped: 1, strategy_committed: 1, service_stabilized: 1, root_cause_decided: 1, current_evidence: 1, handoff_ready: 1, verified_delivery: 2 }),
 });
 const clone = (value) => structuredClone(value);
-const emptyLoadouts = () => ({ 'case-01': [], 'case-02': [], 'case-03': [] });
+const emptyLoadouts = () => ({ 'case-01': [], 'case-02': [], 'case-03': [], 'case-04': [] });
 const plain = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const validCareerId = (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{7,63}$/.test(value);
 function assertPlain(value, label) { if (!plain(value)) throw new Error(`${label} 必須是 object`); }
@@ -80,7 +81,14 @@ export function decodeCareer(text) {
   let envelope; try { envelope = JSON.parse(text); } catch { return { status: 'invalid', reason: '存檔不是合法 JSON' }; }
   if (!plain(envelope)) return { status: 'invalid', reason: '存檔外層格式錯誤' };
   if (envelope.schemaVersion !== CAREER_SCHEMA_VERSION) return { status: 'unsupported', reason: `不支援的存檔版本：${String(envelope.schemaVersion)}` };
-  try { return { status: 'ready', career: validateCareer(envelope.career) }; } catch (error) { return { status: 'invalid', reason: error.message }; }
+  try {
+    const candidate = clone(envelope.career);
+    const legacyCaseIds = ['case-01', 'case-02', 'case-03'];
+    const loadoutIds = plain(candidate?.loadoutsByCase) ? Object.keys(candidate.loadoutsByCase).sort() : [];
+    const upgraded = loadoutIds.join('|') === legacyCaseIds.join('|');
+    if (upgraded) candidate.loadoutsByCase['case-04'] = [];
+    return { status: 'ready', career: validateCareer(candidate), upgraded };
+  } catch (error) { return { status: 'invalid', reason: error.message }; }
 }
 export function decodeLegacyCareer(text) {
   let envelope; try { envelope = JSON.parse(text); } catch { return { status: 'invalid', reason: '舊存檔不是合法 JSON' }; }

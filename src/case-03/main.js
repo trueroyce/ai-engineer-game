@@ -89,4 +89,4 @@ document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && 
 window.addEventListener('beforeunload', (event) => { if (state?.phase === 'playing') { event.preventDefault(); event.returnValue = ''; } });
 window.__AIEG_CASE03_TEST__ = { get state() { return state ? structuredClone(state) : null; }, setState(next) { state = structuredClone(next); screen = state.phase === 'ended' ? 'ending' : state.pendingReward ? 'reward' : 'board'; settlement = null; render(); }, get screen() { return screen; }, exportRunRecord() { return state ? buildCareerCaseRunRecord(state) : null; } };
 render();
-// Static Pages build: coach capability discovery is intentionally disabled.
+coach.discover();

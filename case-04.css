@@ -1,0 +1,9 @@
+@import url("./case-03.css");
+
+:root { --paper:#fff8e8; --panel:#fffdf8; --mint:#aad7c8; --teal:#184f4a; --amber:#ffd166; --coral:#ef6f6c; --blue:#9cc9ff; }
+body { background:linear-gradient(135deg,#182a32,#254c4a); }
+.hero:after { content:"LEGACY"; color:#eadfc1; font-size:clamp(4rem,12vw,9rem); }
+.action-card .mark,.beat b { background:#ffd166; }
+.case04-art { width:100%; max-height:230px; background:#fff3cf; border:3px solid var(--ink); border-radius:18px; }
+.case04-art .screen{fill:#18333b;stroke:var(--ink);stroke-width:4}.case04-art .code{stroke:#91e5c7;stroke-width:5}.case04-art .alarm{fill:#ef6f6c;stroke:var(--ink);stroke-width:4}.case04-art .paper{fill:#fffdf8;stroke:var(--ink);stroke-width:4}.case04-art .wire{fill:none;stroke:#f4b942;stroke-width:5}.case04-art .good{fill:#aad7c8}.case04-art .bad{fill:#ffb3b1}.case04-art text{font:700 13px system-ui;fill:#15212b}.story-strip{background:#fff0b8;border:2px dashed var(--ink);padding:12px 16px;margin:16px 0;display:flex;justify-content:space-between;gap:16px}.issue-open{color:#a33131}.issue-resolved{color:#236b57;text-decoration:line-through}.ending .hero{background:linear-gradient(145deg,#fffdf8,#fff0b8)}
+@media(max-width:600px){.story-strip{display:block}.case04-art{max-height:180px}}

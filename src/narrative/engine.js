@@ -2,6 +2,7 @@ import { ACTIONS, CARDS, CASE01_CARD_IDS, LIMITS, RULE_VERSION, TEMPLATES, asser
 import { ENDINGS, EVENTS } from './content.js';
 import { unitFor, weightedPick } from './rng.js';
 import { buildProcess } from './process-story.js';
+import { case01StoryChoices, normalizeCase01Story, observeCase01Story, performCase01StoryAction, previewCase01StoryAction } from './story.js';
 
 const BASE = Object.freeze({
   A01: [40, 25, 20, 15], A02: [55, 25, 20], A03: [50, 25, 25], A04: [55, 25, 20],
@@ -10,6 +11,7 @@ const BASE = Object.freeze({
 
 const clone = (v) => structuredClone(v);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const usesCase01Story = (state) => state.ruleVersion === RULE_VERSION;
 
 function initialTruth() {
   return { R1: 'not_implemented', R2: 'not_implemented', R3: 'not_implemented', R4: 'not_implemented', R5: 'not_implemented', R6: 'correct' };
@@ -71,6 +73,7 @@ export function createNarrativeGame({ seed = `case-${Date.now()}`, templateId = 
     eventDecisions: {}, resolved: {}, resolvedKeyByAction: {}, lastOptionsByAction: {}, operationResults: {}, operationPayloads: {}, ledger: [], xp: 0, pendingUpgrades: [], claimedThresholds: [], careerRewards: [], rewardClaims: [],
     analysisPrep: 0, firstVerifyUsed: false, extraWishSeen: false, scopeNegotiated: false,
     repairHistory: false, rollbackAvailable: false, checkpoint: null, lastEvent: null, eventCounts: {}, retryUnderstanding: {}, retryCounts: {}, cardUsage: {}, log: [], ending: null,
+    story: normalizeCase01Story(),
   };
 }
 
@@ -143,6 +146,9 @@ function issue(state, code, text, requirements) {
 }
 
 function eligible(state, actionId, options) {
+  if (['A13', 'A14'].includes(actionId)) {
+    return usesCase01Story(state) && case01StoryChoices(state, actionId).length ? [`${actionId}-story`] : [];
+  }
   const ids = EVENTS[actionId]?.map((x) => x.id) ?? [];
   if (actionId === 'A01') {
     if (state.requirement.clarity === 'clear' && state.requirement.scope !== 'pending_change' && !options?.newRevision) return [];
@@ -379,6 +385,7 @@ function subjectOptions(actionId, options = {}) {
   if (actionId === 'A07') stable.target = options.target ?? 'persistence';
   if (actionId === 'A11') stable.mode = options.mode ?? 'fix';
   if (actionId === 'A12' && options.intent) stable.intent = options.intent;
+  if (['A13', 'A14'].includes(actionId) && options.route) stable.route = options.route;
   return stable;
 }
 
@@ -451,6 +458,10 @@ function actionCost(state, actionId, options = {}, retryOverride = null) {
 
 export function previewAction(original, actionId, options = {}) {
   if (actionId === 'A12') return { cached: false, cost: 0, overtime: false };
+  if (['A13', 'A14'].includes(actionId)) {
+    if (!usesCase01Story(original)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    return previewCase01StoryAction(original, actionId, options);
+  }
   const state = clone(original);
   if (options.newRevision || options.repairDraft) state.revisions[actionId] += 1;
   if (state.resolved[eventKeyFor(state, actionId, options)]) return { cached: true, cost: 0, overtime: false };
@@ -525,6 +536,62 @@ export function composeEnding(state, baseId) {
   if (!base) return null;
   const successful = SUCCESS_ENDINGS.has(baseId);
   const candidates = [];
+  const a07Key = state.resolvedKeyByAction?.A07;
+  const a07Result = a07Key ? state.resolved?.[a07Key] : null;
+  if (a07Result?.event) {
+    const target = state.lastOptionsByAction?.A07?.target ?? 'persistence';
+    const failed = a07Result.event.id === 'A07-C';
+    const routeFacet = failed
+      ? { id: `implementation-${target}-scar`, title: '功能送進去，兩個坑跟著搬家', text: '你沒有把這次實作說成完成：選定範圍真的改了，但刪除與相鄰行為的風險也被帶到結案限制裡。' }
+      : {
+          core: { id: 'implementation-core', title: '核心先站穩，順便先排隊', text: '你把新增、完成與取消守在核心範圍；沒有把「順便」當免費，也沒有把未承諾功能寫成已交付。' },
+          delete: { id: 'implementation-delete', title: '刪除鍵繫上安全帶', text: '你只改動刪除路徑並保留受影響證據；沒有順手重寫保存與核心操作，後續驗證也知道該看哪裡。' },
+          persistence: { id: 'implementation-persistence', title: '資料留下來，責任也留下來', text: '你選擇保存與重開路線，並讓相應證據跟著版本前進；這個選擇在結案時仍可追溯。' },
+        }[target];
+    if (routeFacet) candidates.push(routeFacet);
+  }
+  const storyRoute = state.story?.commitment;
+  if (storyRoute) {
+    const resolved = Boolean(state.story?.pendingConsequence?.resolved);
+    const storyFacet = {
+      steady: {
+        id: 'route-steady',
+        title: '先穩住，再讓明天有得改',
+        text: resolved
+          ? '你選擇鎖住已驗證範圍，後來的承諾追問也用紀錄接住；沒有多炫，但沒有把今天的成功拿去賭明天。'
+          : '你選擇鎖住已驗證範圍；這份承諾仍會在後續追問中回來，結案沒有假裝它已經消失。',
+      },
+      expand: {
+        id: 'route-expand',
+        title: '順手多做一點，差點順手多做一案',
+        text: resolved
+          ? '你曾把成功拿去擴張，後來也真的付成本收回或補驗；結局記得這次貪心，不把它藏在漂亮成果後面。'
+          : '你把成功拿去追加範圍，但新增承諾尚未完整收尾；主要交付結果不會替這筆風險美化。',
+      },
+      prototype: {
+        id: 'route-prototype',
+        title: '先做能丟的，才沒把正式版一起丟掉',
+        text: resolved
+          ? '你用原型換到理解，再把原型留下的承諾邊界處理完；它幫忙學習，沒有冒充正式交付。'
+          : '你用原型換到理解，但原型造成的承諾邊界仍待處理；結局把這個限制留在檯面上。',
+      },
+      trim: {
+        id: 'route-trim',
+        title: '砍的是範圍，不是事實',
+        text: resolved
+          ? '你把失敗轉成可核准的小範圍，後續也依新邊界補齊證據；少做一些，但每一項都說得清楚。'
+          : '你縮小範圍救回可交付核心，但新的邊界還需要後續確認；結局不把有限版叫成完整版。',
+      },
+      force: {
+        id: 'route-force',
+        title: '硬做有做完，技術債也有打卡',
+        text: resolved
+          ? '你曾選擇硬做，後來也付出修補與驗證成本；債沒有靠一句「先上再說」自動蒸發。'
+          : '你選擇硬做留下公開風險；即使主流程能跑，這筆未解問題仍會跟著交付說明。',
+      },
+    }[storyRoute];
+    if (storyFacet) candidates.push(storyFacet);
+  }
   if (successful && state.repairHistory) {
     candidates.push({ id: 'recovered', title: '從火場帶著測試報告走出來', text: '你真的遇過問題、修過問題，也重新驗證過；這不是沒摔倒，是摔倒後把坑畫進地圖。' });
   }
@@ -579,6 +646,42 @@ export function performAction(original, actionId, options = {}) {
       : { type: 'gap', message: delivery.message, safeTrial: safeForTrial(state), intent: options.intent };
     state.stateVersion += 1; state.operationResults[operationId] = result; state.operationPayloads[operationId] = payload;
     state.log.push({ actionId, intent: options.intent, result: result.type, options: { intent: options.intent }, resourcesAfter: resourceSnapshot(state) });
+    return { state, result, cached: false };
+  }
+
+  if (['A13', 'A14'].includes(actionId)) {
+    if (!usesCase01Story(state)) throw new Error('此舊局沿用原規則，請完成後再開新局體驗新路線');
+    if (state.pendingUpgrades.length) throw new Error('請先處理目前的職涯獎勵');
+    if (state.workCount >= LIMITS.hardWork) throw new Error('工作上限已到，只能交付或止損');
+    if (!eligible(state, actionId, options).length) return { state: original, result: { type: 'not-applicable', message: '目前沒有待處理的路線決策。' }, cached: false };
+    const preview = previewCase01StoryAction(state, actionId, options);
+    if (preview.overtime && state.overtimeUsed >= 2) throw new Error('加班次數已用完，只能交付或止損');
+    if (state.token < preview.cost) throw new Error('Token 不夠了；請休息、交付或止損');
+    state.token -= preview.cost;
+    state.workCount += 1;
+    state.timeLeft = Math.max(0, state.timeLeft - preview.timeCost);
+    state.stress = clamp(state.stress + preview.stress + (preview.overtime ? 2 : 0), 0, LIMITS.stressCap);
+    if (preview.overtime) state.overtimeUsed += 1;
+    const output = performCase01StoryAction(state, actionId, options);
+    const result = {
+      ...output.result,
+      cost: preview.cost,
+      timeCost: preview.timeCost,
+      overtime: preview.overtime,
+      key: eventKeyFor(state, actionId, options),
+      recordId: `${state.caseId}-result-${state.workCount}-${state.stateVersion + 1}`,
+      resourcesAfter: resourceSnapshot(state),
+      artifactRevisionAfter: state.artifact.revision,
+    };
+    state.context.jobsSinceSummary += 1;
+    state.lastEvent = clone(result);
+    state.resolved[result.key] = clone(result);
+    state.resolvedKeyByAction[actionId] = result.key;
+    state.lastOptionsByAction[actionId] = executionOptions(actionId, options);
+    state.operationResults[operationId] = clone(result);
+    state.operationPayloads[operationId] = payload;
+    state.stateVersion += 1;
+    state.log.push({ actionId, eventId: result.event.id, cost: preview.cost, work: state.workCount, options: { route: options.route } });
     return { state, result, cached: false };
   }
 
@@ -662,6 +765,7 @@ export function performAction(original, actionId, options = {}) {
     resourcesAfter: resourceSnapshot(state),
     artifactRevisionAfter: state.artifact.revision,
   };
+  if (usesCase01Story(state)) observeCase01Story(state, actionId, result);
   const replayOptions = {};
   for (const key of ['target', 'mode', 'useC2', 'useC3', 'checkDelete', 'newRevision', 'repairDraft']) {
     if (options[key] !== undefined) replayOptions[key] = options[key];

@@ -275,4 +275,4 @@ async function discoverLocalCoach() {
   }
 }
 
-// Static Pages build: never probe a local capability or expose coach controls.
+discoverLocalCoach();

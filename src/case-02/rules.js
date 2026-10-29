@@ -1,4 +1,4 @@
-export const CASE02_RULE_VERSION = 'case-02-csv@2';
+export const CASE02_RULE_VERSION = 'case-02-csv@3';
 
 export const CASE02_LIMITS = Object.freeze({
   token: 18,
@@ -17,6 +17,9 @@ export const CASE02_ACTIONS = Object.freeze({
   B07: { id: 'B07', title: '建立來源追溯', group: 'audit', tutorial: '讓每個數字能回到來源列、mapping 版本與退款規則。' },
   B08: { id: 'B08', title: '把腦袋從 CSV 拔出來一下', group: 'rest', tutorial: '休息花時間但回復 Token 與壓力；Context 管理卡會放大恢復。' },
   B09: { id: 'B09', title: '交付、限縮或止損', group: 'delivery', tutorial: '結果只依目前公開證據判定；不會因角色變強而暗中提高門檻。' },
+  B10: { id: 'B10', title: '失敗後改走救援路線', group: 'story', tutorial: '原型、砍範圍與硬做有不同代價；卡片可開特殊救援，但沒有卡仍能繼續。' },
+  B11: { id: 'B11', title: '成功後決定要不要貪心', group: 'story', tutorial: '穩交、改善或追加來源；冒險會留下之後真的回來找你的承諾。' },
+  B12: { id: 'B12', title: '處理回頭找你的延後後果', group: 'story', tutorial: '只處理對應問題；修欄位分歧不會順便還原刪除資料或核准客戶決策。' },
 });
 
 export const CASE02_REWARD_ID = 'case-02:reward:integration-kit';

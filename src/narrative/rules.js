@@ -1,4 +1,4 @@
-export const RULE_VERSION = 'case-01-narrative@2';
+export const RULE_VERSION = 'case-01-narrative@3';
 
 export const SIMULATION_NOTICE = '本遊戲以情境文本演出 Claude Code 操作，不會連線或呼叫真正的 Claude Code。';
 
@@ -71,6 +71,8 @@ export const ACTIONS = Object.freeze({
   A10: { id: 'A10', title: '整理桌面，不是把東西掃進床底', cost: 1, ability: 'A', command: '/context → /compact → /rename', risk: '摘要可能把「準備做」寫成「已完成」。' },
   A11: { id: 'A11', title: '修一下，真的只修一下', cost: 2, ability: 'E', command: '/rewind → Edit → Bash', risk: '程式碼回去了，時間並不會。' },
   A12: { id: 'A12', title: '現在交，還是再修一輪', cost: 0, ability: null, command: '交付檢查', risk: '結局只看目前證據與交付意圖。' },
+  A13: { id: 'A13', title: '決定這次成果要穩住、轉向，還是冒險', cost: 1, ability: null, command: 'Read → /plan → 記錄決策', risk: '選擇會留下具名承諾，兩次後續工作後仍會回來找你。' },
+  A14: { id: 'A14', title: '處理先前選擇回來敲門的後果', cost: 1, ability: null, command: 'Read → Edit → Bash', risk: '只處理這個後果；不會順便把其他缺陷洗掉。' },
 });
 
 export const LIMITS = Object.freeze({

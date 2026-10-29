@@ -3,6 +3,8 @@ import { CASE02_ACTIONS } from '../case-02/rules.js';
 import { case02PublicView } from '../case-02/engine-v2.js';
 import { CASE03_ACTIONS } from '../case-03/rules.js';
 import { case03PublicView } from '../case-03/engine.js';
+import { CASE04_ACTIONS } from '../case-04/rules.js';
+import { case04PublicView } from '../case-04/engine.js';
 import { TEMPLATES } from '../narrative/rules.js';
 import { RUN_LIMITS, RUN_SCHEMA_VERSION, validateRunRecord } from './run-schema.js';
 
@@ -21,11 +23,19 @@ const CASE_META = Object.freeze({
     view: case03PublicView,
     tiers: Object.freeze({ 'C03-VERIFIED': '正式交付', 'C03-LIMITED': '有限試用', 'C03-FAILED': '風險交付', 'C03-STOP': '誠實止損' }),
   },
+  'case-04': {
+    prefix: 'case04',
+    actions: CASE04_ACTIONS,
+    delivery: 'D09',
+    view: case04PublicView,
+    tiers: Object.freeze({ 'C04-VERIFIED': '正式上線', 'C04-LIMITED': '有限維持', 'C04-FAILED': '風險交付', 'C04-STOP': '誠實止損' }),
+  },
 });
 
 const OPTION_KEYS = Object.freeze(new Set([
   'idPolicy', 'datePolicy', 'duplicatePolicy', 'strategy', 'useRapid', 'useFastMerge',
   'response', 'mode', 'scope', 'mergeMode', 'intent',
+  'route', 'method', 'agentMode', 'cause', 'depth', 'compatibility', 'proposal',
 ]));
 
 function clipped(value, max = RUN_LIMITS.maxLongText) {
@@ -141,6 +151,30 @@ function publicProgress(state, view) {
       issueSummary: clipped(view.blockers.length ? `仍有 ${view.blockers.length} 個公開交付缺口。` : '公開交付條件均已完成。'),
     };
   }
+  if (state.caseId === 'case-04') {
+    const approvalStatus = view.approval?.status === 'approved' && view.approval.revision === view.revision
+      ? `${view.approval.scope} · ${view.approval.owner}`
+      : view.approval?.status === 'changes-requested'
+        ? `負責人退回：${view.approval.reasons?.join('；') ?? '需要補件'}`
+        : '尚未取得目前版負責人核准';
+    const checks = [
+      ['事故定位', view.diagnosis?.scoped ? '可重現' : view.diagnosis ? '仍有不確定性' : '未處理'],
+      ['服務狀態', view.service.stable ? '目前穩定' : '仍不穩定'],
+      ['資料相容', view.dataCompatibility],
+      ['相容決策', view.compatibilityDecision?.status === 'decided' && view.compatibilityDecision.revision === view.revision ? `${view.compatibilityDecision.result} · rev ${view.revision}` : '尚未形成目前版決策'],
+      ['範圍核准', approvalStatus],
+      ['目前證據', view.evidence.revision === view.revision ? `${view.evidence.coverage}/4` : '尚未覆蓋目前 revision'],
+      ['值班交接', view.handoff.complete ? '完成' : '未完成'],
+    ];
+    return {
+      pendingQuestions: view.blockers.slice(0, 12).map((item) => clipped(item, RUN_LIMITS.maxShortText)),
+      documentText: clipped(`策略=${view.strategy ?? '未選'}；根因=${view.rootCause?.cause ?? '未決'}；資料相容=${view.dataCompatibility}；範圍核准=${approvalStatus}。`),
+      artifactText: clipped(`legacy revision ${view.revision}；服務${view.service.stable ? '穩定' : '不穩定'}；證據 ${view.evidence.coverage}/4。`),
+      checks: checks.map(([label, status]) => ({ label, status: clipped(status, RUN_LIMITS.maxShortText) })),
+      knownIssues: view.issues.filter((item) => item.status === 'open').slice(0, RUN_LIMITS.maxKnownIssues).map((item) => clipped(item.text)),
+      issueSummary: clipped(view.blockers.length ? `仍有 ${view.blockers.length} 個公開救火缺口。` : '公開上線與交接條件均已完成。'),
+    };
+  }
   const checks = [
     ['需求決策', view.requirements?.clear ? '已確認' : view.requirements ? '仍有歧義' : '未處理'],
     ['介面契約', view.contract?.approved ? '客戶已核准' : '未核准'],
@@ -159,7 +193,7 @@ function publicProgress(state, view) {
 
 export function buildCareerCaseRunRecord(state) {
   const meta = CASE_META[state?.caseId];
-  if (!meta || state.phase !== 'ended' || !state.ending) throw new Error('只有已結案的案件 02／03 可以輸出');
+  if (!meta || state.phase !== 'ended' || !state.ending) throw new Error('只有已結案的案件 02／03／04 可以輸出');
   const view = meta.view(state);
   const template = TEMPLATES[state.templateId];
   const timeline = timelineFrom(state, meta);

@@ -9,12 +9,17 @@ const scenes = Object.freeze({
   C06: '<path class="paper" d="M42 27h236v137H42z"/><path d="M69 53l10 10 18-22M69 84l10 10 18-22M69 115l10 10 18-22M112 53h130M112 84h103M112 115h118"/><path class="accent" d="M225 129l17 17 29-39"/>',
   C07: '<path class="screen" d="M51 36h218v112H51z"/><path class="paper" d="M76 58h168v68H76z"/><circle class="client" cx="104" cy="92" r="17"/><circle class="designer" cx="160" cy="92" r="17"/><circle class="engineer" cx="216" cy="92" r="17"/><path class="accent" d="M102 154h116"/>',
   C08: '<path class="paper" d="M55 40h210v105H55z"/><path d="M78 62h68M78 82h52M78 102h68"/><path class="accent" d="M203 58q42 27 0 56M203 114l10-18-20 2"/><path class="danger" d="M168 47v89"/>',
+  C09: '<path class="paper" d="M45 38h230v110H45z"/><circle class="client" cx="88" cy="89" r="25"/><path class="screen" d="M132 58h115v66H132z"/><path class="accent" d="M102 89h30M158 77h62M158 99h45"/>',
+  C10: '<path class="screen" d="M35 36h250v111H35z"/><path class="paper" d="M53 55h68v69H53zM126 55h68v69h-68zM199 55h68v69h-68z"/><path class="accent" d="M69 88l12 12 24-29M143 88h34M215 76l36 36M251 76l-36 36"/>',
+  C11: '<path class="paper" d="M43 35h234v117H43z"/><circle class="client" cx="83" cy="86" r="23"/><path class="screen" d="M126 55h126v67H126z"/><path class="accent" d="M150 75h78M150 98h52"/><path class="danger" d="M107 86h19"/>',
 });
 
 const cast = Object.freeze({
   C01: ['客戶阿改', '「只改一點」共三點'], C02: ['設計師小美', '先把介面契約簽了'], C03: ['工程師老周', '分工不是分散責任'],
   C04: ['Reviewer 小莫', '合併前先對證據'], C05: ['客戶阿改', '下午四點又想到'], C06: ['QA 阿驗', 'revision 變了就重驗'],
   C07: ['三方會議', '交付責任要有名字'], C08: ['救火隊長', '修債不修飾太平'],
+  C09: ['原型桌', '先讓客戶按了再吵'], C10: ['成功誘惑', '只多一個功能，真的'],
+  C11: ['責任會議', '決策債與工程債分開算'],
 });
 
 function castFocus(actionId) {
