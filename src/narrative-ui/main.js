@@ -248,6 +248,8 @@ window.__AIEG_NARRATIVE_TEST__ = {
 render();
 
 async function discoverLocalCoach() {
+  const host = globalThis.location?.hostname;
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) return;
   try {
     const response = await fetch('/api/local-coach/capability', {
       headers: { Accept: 'application/json' },
