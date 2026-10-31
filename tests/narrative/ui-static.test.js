@@ -79,5 +79,6 @@ test('賽後教練只在可信本機 capability 存在時渲染，靜態版沒�
   ].map((file) => fs.readFileSync(new URL(file, import.meta.url), 'utf8')).join('\n');
   assert.doesNotMatch(staticRuntime, /https?:\/\/(?:127\.0\.0\.1|localhost)|\.mcp\.json|scripts\/mcp-postgame|src\/local-coach/i);
   const main = fs.readFileSync(new URL('../../src/narrative-ui/main.js', import.meta.url), 'utf8');
-  assert.match(main, /fetch\('\/api\/local-coach\/capability'/);
+  assert.match(main, /discoverCoachCapability\(globalThis\)/);
+  assert.doesNotMatch(main, /fetch\('\/api\/local-coach\/capability'/);
 });

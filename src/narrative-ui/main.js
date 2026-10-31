@@ -1,6 +1,7 @@
 import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoices, performAction, previewAction, readPreviousActionResult, rest } from '../narrative/engine.js';
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
 import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
+import { discoverLocalCoach as discoverCoachCapability } from '../postgame/coach-ui.js';
 import { loadCareer, reserveRun, saveActiveRun, saveCareer, settleCase } from '../career/state-v2.js';
 import { captureActiveControl, focusChangedScreen } from '../presentation/screen-transition.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
@@ -257,31 +258,10 @@ window.__AIEG_NARRATIVE_TEST__ = {
 render();
 
 async function discoverLocalCoach() {
-  try {
-    const response = await fetch('/api/local-coach/capability', {
-      headers: { Accept: 'application/json' },
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-    if (!response.ok || !String(response.headers.get('content-type')).toLowerCase().startsWith('application/json')) return;
-    const capability = await response.json();
-    if (capability?.schema !== 'ai-engineer-game.local-coach.v1'
-      || capability.endpoint !== '/api/local-coach/runs'
-      || capability.analysisEndpoint !== '/api/local-coach/analyze'
-      || capability.cancelEndpoint !== '/api/local-coach/cancel'
-      || typeof capability.csrfToken !== 'string'
-      || !/^[A-Za-z0-9_-]{32,128}$/.test(capability.csrfToken)) return;
-    localCoach = {
-      schema: capability.schema,
-      endpoint: capability.endpoint,
-      analysisEndpoint: capability.analysisEndpoint,
-      cancelEndpoint: capability.cancelEndpoint,
-      csrfToken: capability.csrfToken,
-    };
-    render();
-  } catch {
-    // 靜態頁面或已停止的本機 server 不顯示教練入口。
-  }
+  const capability = await discoverCoachCapability(globalThis);
+  if (!capability) return;
+  localCoach = capability;
+  render();
 }
 
 discoverLocalCoach();
