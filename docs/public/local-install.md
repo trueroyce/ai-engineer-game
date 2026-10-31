@@ -92,4 +92,3 @@ claude mcp list
 ```
 
 Node.js 應為 24 以上；Claude Code 應已依官方流程登入。即使分析不可用，遊戲、職涯 localStorage 與本機 `runs/` 仍不應被清除。
-
