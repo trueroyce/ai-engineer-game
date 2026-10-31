@@ -1,9 +1,10 @@
 @echo off
 setlocal
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-AIEngineerGame.ps1" %*
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-AIEngineerGame.ps1" %*
+set "launcherExit=%errorlevel%"
 if errorlevel 1 (
   echo.
-  echo 啟動失敗。請閱讀上方原因；這個視窗會保留到你按任意鍵。
+  echo Launch failed. Review the PowerShell error above. Press any key to close.
   pause >nul
 )
-endlocal
+endlocal & exit /b %launcherExit%

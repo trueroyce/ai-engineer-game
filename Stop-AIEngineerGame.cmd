@@ -1,9 +1,10 @@
 @echo off
 setlocal
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Stop-AIEngineerGame.ps1" %*
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Stop-AIEngineerGame.ps1" %*
+set "launcherExit=%errorlevel%"
 if errorlevel 1 (
   echo.
-  echo 停止失敗。為避免關掉無關程序，啟動器已拒絕操作。
+  echo Stop failed. The launcher refused to stop an unverified process.
   pause >nul
 )
-endlocal
+endlocal & exit /b %launcherExit%

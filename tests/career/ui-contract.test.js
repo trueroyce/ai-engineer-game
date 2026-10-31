@@ -39,3 +39,19 @@ test('職涯模式與第一版 direct mode 由明確 query 參數隔離', async 
   assert.match(source, /careerMode && !career/);
   assert.match(source, /saveCareer\(careerSettlement\.career\)/);
 });
+
+test('Windows 啟動批次檔保留 ASCII 控制層與原生 CRLF', async () => {
+  const [attributes, ...launchers] = await Promise.all([
+    read('../../.gitattributes'),
+    read('../../Start-AIEngineerGame.cmd'),
+    read('../../Stop-AIEngineerGame.cmd'),
+    read('../../Start-AIEngineerGame-Legacy.cmd'),
+  ]);
+  assert.match(attributes, /^\*\.cmd -text whitespace=cr-at-eol$/m);
+  for (const source of launchers) {
+    assert.equal(source.replaceAll('\r\n', '').includes('\n'), false);
+    assert.equal([...source].every((character) => character.codePointAt(0) < 128), true);
+  }
+  assert.match(launchers[0], /-ExecutionPolicy Bypass/);
+  assert.match(launchers[0], /exit \/b %launcherExit%/);
+});
