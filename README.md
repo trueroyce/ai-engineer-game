@@ -27,19 +27,21 @@
 
 ### 本機執行
 
-需求：Node.js 24 以上。專案沒有第三方 npm 相依套件。
+需求：Git、Node.js 24 以上；專案沒有第三方 npm 相依套件，不需 `npm install`。Windows 建議使用內附啟動器，固定沿用 `127.0.0.1:8091`，避免因更換 port 看見另一份 localStorage：
 
 ```powershell
 git clone https://github.com/trueroyce/ai-engineer-game.git
 cd ai-engineer-game
-npm start
+.\Start-AIEngineerGame.cmd
 ```
 
-終端機會顯示本機網址，預設為 `http://127.0.0.1:8080/`。要改用其他連接埠：
+啟動器會檢查 Node.js、辨識並沿用正確的既有服務、拒絕終止占用 8091 的無關程序，確認遊戲資產與本機 coach/MCP capability 後再開啟瀏覽器。停止請執行：
 
 ```powershell
-npm start -- 9000
+.\Stop-AIEngineerGame.cmd
 ```
+
+不用啟動器時可執行 `npm start -- 8091`，保持終端機開啟並以 `Ctrl+C` 停止。完整依賴、重開機、port／存檔注意事項與 Claude Code 設定請見 [Windows 本機安裝與啟動](docs/public/local-install.md)。
 
 ## 存檔、重玩與結局
 
@@ -81,6 +83,7 @@ npm run test:local-coach
 - [版本說明](docs/public/release-notes.md)
 - [測試指南](docs/public/testing.md)
 - [Claude Code 指令旁欄查核](docs/public/cli-reference.md)
+- [Windows 本機安裝與啟動](docs/public/local-install.md)
 - [AI 協作摘要](docs/public/ai-collaboration-summary.md)
 - [貢獻與角色說明](CONTRIBUTORS.md)
 - [MCP 與本機賽後教練](docs/mcp/README.md)

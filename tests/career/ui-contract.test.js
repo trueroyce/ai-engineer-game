@@ -20,13 +20,17 @@ test('接案大廳保留前三案並接入已實作第四案', async () => {
   assert.match(source, /'04': \{ available: true/);
 });
 
-test('第一版入口保留，職涯首頁使用獨立程式與樣式', async () => {
-  const [index, classic, casePage] = await Promise.all([read('../../index.html'), read('../../classic.html'), read('../../case-01.html')]);
+test('職涯首頁移除舊版連結，但舊版頁面與樣式仍保留', async () => {
+  const [index, main, classic, casePage, legacyLauncher] = await Promise.all([read('../../index.html'), read('../../src/career/main.js'), read('../../classic.html'), read('../../case-01.html'), read('../../Start-AIEngineerGame-Legacy.cmd')]);
   assert.match(index, /src\/career\/main\.js/);
   assert.match(index, /career\.css/);
+  assert.doesNotMatch(main, /href="\.\/classic\.html"/);
+  assert.doesNotMatch(main, /href="\.\/case-01\.html"/);
   assert.match(classic, /src\/ui\/main\.js/);
   assert.match(classic, /styles\.css/);
   assert.match(casePage, /src\/narrative-ui\/main\.js/);
+  assert.match(legacyLauncher, /Start-AIEngineerGame\.cmd" -NoBrowser/);
+  assert.match(legacyLauncher, /127\.0\.0\.1:8091\/classic\.html/);
 });
 
 test('職涯模式與第一版 direct mode 由明確 query 參數隔離', async () => {
