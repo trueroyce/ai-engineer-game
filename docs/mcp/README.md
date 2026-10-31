@@ -1,6 +1,6 @@
 # 唯讀 MCP 賽後教練
 
-本機版的主要流程已是一鍵分析：以 `npm start -- 8081` 啟動後，玩家在結算頁按「分析這局」，同源 loopback server 會自動存入 `runs/`、以受限的非互動 Claude Code 呼叫下列唯讀 MCP，再把結構化講評顯示回網頁。玩家不必下載、搬檔、開另一個 Claude 視窗或貼 runId。
+本機版的主要流程已是一鍵分析：以 `Start-AIEngineerGame.cmd`（或 `npm start -- 8091`）啟動後，玩家在結算頁按「分析這局」，`http://127.0.0.1:8091/` 的同源 loopback server 會自動存入 `runs/`、以受限的非互動 Claude Code 呼叫下列唯讀 MCP，再把結構化講評顯示回網頁。玩家不必下載、搬檔、開另一個 Claude 視窗或貼 runId。
 
 這個按鈕會使用目前 Claude Code 登入帳號的額度，並將該局公開遊戲紀錄傳給 Claude 服務；不需要 API key，也不是離線功能。GitHub Pages 沒有本機 capability，整個入口不會渲染。若一鍵流程不可用，下面的手動 MCP 步驟仍可作診斷／備援，但不是一般使用的主路徑。
 
@@ -14,7 +14,7 @@
 
 ## 1. 從本機遊戲直接存入 runs
 
-1. 以 `npm start` 開啟 `http://127.0.0.1:8080/`，從大廳選案件 01、02、03 或 04。
+1. 執行 `Start-AIEngineerGame.cmd`，或以 `npm start -- 8091` 開啟 `http://127.0.0.1:8091/`，從大廳選案件 01、02、03 或 04。請固定使用同一個 8091 origin，避免瀏覽器把 localStorage 視為另一份存檔。
    案件 04 的回滾相容／隔離決策與客戶／產品負責人範圍核准會寫入本局公開紀錄；模擬 agent 不會代簽。
 2. 完成或停止所選案件後，按「存入本機賽後教練」或「分析這局」。
 3. 畫面顯示成功與 `runId` 後，合法 JSON 已寫入專案的 `runs/<runId>.json`；不需下載或搬檔。
@@ -36,6 +36,8 @@ npm run test:mcp
 這會以真正子程序走過 `initialize` → `notifications/initialized` → `tools/list` → `tools/call`，另測壞 JSON、版本不符、巨大輸入、重名 ID、路徑攻擊、reparse escape、輸出截斷及 stdout 純度。
 
 ## 3. 專案範圍接入 Claude Code（需你親自核准）
+
+這一節是另一種手動接法：MCP server 由 Claude Code 以 **stdio 子程序**啟動，本身沒有 HTTP port。前述 8091 是遊戲頁面與受限寫入／分析 bridge 共用的 loopback HTTP port；兩者不要混為一談。
 
 此階段只交付範本，沒有替你啟用。兩種等價作法請擇一：
 
