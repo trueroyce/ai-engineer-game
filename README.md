@@ -90,7 +90,7 @@ npm run test:local-coach
 
 ## AI 協作與作者界線
 
-這個專案由人類提出方向、選擇設計、試玩並決定是否接受與發布；OpenAI GPT／Codex 協助實作、測試、除錯、文件與視覺資產整合；Anthropic Claude／Claude Code 參與早期規格工作、唯讀美術方向討論與本機賽後分析。所有 AI 輸出都經過人類決策與實際驗證，不能視為自動完成或獨立作者。
+這個專案由人類提出方向、選擇設計、試玩並決定是否接受與發布；Anthropic Claude／Claude Code 完成初期 OpenSpec、第一版引擎／UI／測試的大部分實作與後續案件 01 敘事規劃，並參與兩輪唯讀美術方向討論；實作中斷後，OpenAI GPT／Codex 依使用者授權接手敘事四案、整合、測試、除錯、文件與視覺資產製作。Claude 另在本機提供玩家主動觸發的賽後分析。所有 AI 輸出都經過人類決策與實際驗證，不能視為自動完成或獨立作者。
 
 GitHub 的 Contributors 圖表只會依 Git commit 的真實作者帳號自動產生。GPT 與 Claude 不是本專案的 GitHub 人類帳號，因此不會以假帳號、假 email、重寫歷史或新增協作者權限來製造圖表紀錄；實際貢獻改以本 README、[`CONTRIBUTORS.md`](CONTRIBUTORS.md) 與[AI 協作摘要](docs/public/ai-collaboration-summary.md)公開說明。
 
