@@ -58,14 +58,28 @@ async function main() {
     const { page } = browser;
     await page.goto(`${base}case-01.html?seed=balance-011`);
     await page.waitFor('document.querySelectorAll("[data-template]").length === 6');
-    const intro = await page.eval(`({
-      portraits: document.querySelectorAll('.portrait').length,
-      names: [...document.querySelectorAll('.template-card strong')].map((node) => node.textContent),
-      ctaTop: document.querySelector('[data-next="cards"]').getBoundingClientRect().top,
-      ctaBottom: document.querySelector('[data-next="cards"]').getBoundingClientRect().bottom,
-      allocation: Boolean(document.querySelector('.attrs, [data-attr]')),
-    })`);
+    const intro = await page.eval(`(async () => {
+      const portraits = [...document.querySelectorAll('.template-card .raster-template')];
+      const portraitBackgrounds = portraits.map((node) => getComputedStyle(node).backgroundImage);
+      const portraitAssets = await Promise.all(portraits.map((node) => new Promise((resolve) => {
+        const url = getComputedStyle(node).getPropertyValue('--portrait-image').match(/url\\(["']?(.*?)["']?\\)/)?.[1];
+        const image = new Image();
+        image.onload = () => resolve({ url, width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => resolve({ url, width: 0, height: 0 });
+        image.src = url;
+      })));
+      return {
+        portraits: portraits.length,
+        portraitBackgrounds,
+        portraitAssets,
+        names: [...document.querySelectorAll('.template-card strong')].map((node) => node.textContent),
+        ctaTop: document.querySelector('[data-next="cards"]').getBoundingClientRect().top,
+        ctaBottom: document.querySelector('[data-next="cards"]').getBoundingClientRect().bottom,
+        allocation: Boolean(document.querySelector('.attrs, [data-attr]')),
+      };
+    })()`);
     check('選角有六張獨立肖像且不露配點', intro.portraits === 6 && new Set(intro.names).size === 6 && !intro.allocation, JSON.stringify(intro));
+    check('選角六張立繪實際套用且可解碼', intro.portraitBackgrounds.every((value) => value.includes('url(')) && intro.portraitAssets.every((asset) => asset.width > 0 && asset.height > 0), JSON.stringify(intro));
     check('開場主 CTA 在第一個桌面視窗內', intro.ctaTop >= 0 && intro.ctaBottom <= 900, JSON.stringify(intro));
     await viewportAudit(page, '1280px 選角');
     await shot(page, '01-character-selection-1280');
@@ -147,10 +161,12 @@ async function main() {
     endingState.repairHistory = true;
     endingState.phase = 'ended';
     endingState.ending = composeEnding(endingState, 'E01');
-    await page.eval(`window.__AIEG_NARRATIVE_TEST__.setState(${JSON.stringify(endingState)})`);
+    await page.eval(`scrollTo(0, document.body.scrollHeight); window.__AIEG_NARRATIVE_TEST__.setState(${JSON.stringify(endingState)})`);
     await page.waitFor('document.querySelector(".ending-tableau")');
-    const ending = await page.eval(`({ tier: document.querySelector('.ending-stamp strong')?.textContent, art: document.querySelector('.ending-illustration')?.className.baseVal, badges: document.querySelectorAll('.ending-badge').length, rules: document.querySelector('.ending-rules')?.tagName })`);
-    check('結局以主要交付層級為主、特色稱號醒目且規則可收合', ending.tier === '正式交付' && ending.art.includes('ending-formal') && ending.badges >= 1 && ending.rules === 'DETAILS', JSON.stringify(ending));
+    await page.waitFor("document.activeElement === document.querySelector('.ending h1')");
+    const ending = await page.eval(`(() => { const hud = document.querySelector('.hud')?.getBoundingClientRect(); const h1 = document.querySelector('.ending h1')?.getBoundingClientRect(); return { tier: document.querySelector('.ending-stamp strong')?.textContent, art: document.querySelector('.ending-illustration')?.className, expression: document.querySelector('.ending-illustration .raster-template')?.getAttribute('style'), badges: document.querySelectorAll('.ending-badge').length, rules: document.querySelector('.ending-rules')?.tagName, scrollY, h1Top: h1?.top, hudBottom: hud?.bottom, focused: document.activeElement === document.querySelector('.ending h1') }; })()`);
+    check('結局以主要交付層級為主、特色稱號醒目且規則可收合', ending.tier === '正式交付' && ending.art.includes('ending-formal') && ending.expression.includes('player-ultimate-relieved.png') && ending.badges >= 1 && ending.rules === 'DETAILS', JSON.stringify(ending));
+    check('結局階段切換回到可見標題並移動邏輯焦點', ending.h1Top >= ending.hudBottom - 1 && ending.focused, JSON.stringify(ending));
     await viewportAudit(page, '1280px 結局');
     await shot(page, '09-ending-1280');
 

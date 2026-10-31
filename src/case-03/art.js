@@ -1,3 +1,5 @@
+import { characterPortrait } from '../narrative-ui/art.js';
+
 const svg = (className, body, viewBox = '0 0 320 190') => `<svg class="${className}" viewBox="${viewBox}" role="img" aria-label="案件 03 客戶與 NPC 協作情境插畫">${body}</svg>`;
 
 const scenes = Object.freeze({
@@ -34,8 +36,8 @@ function toneMark(tone) {
   return '';
 }
 
-export function case03ActionArt(actionId, tone = 'mixed') {
-  return svg(`case-art case03-art tone-${tone}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/>${scenes[actionId] ?? scenes.C01}${castFocus(actionId)}${toneMark(tone)}`);
+export function case03ActionArt(actionId, tone = 'mixed', { showCast = true } = {}) {
+  return svg(`case-art case03-art tone-${tone}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/>${scenes[actionId] ?? scenes.C01}${showCast ? castFocus(actionId) : ''}${toneMark(tone)}`);
 }
 
 export function case03StatusArt(view) {
@@ -45,10 +47,14 @@ export function case03StatusArt(view) {
   return svg('case-art case03-status', `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/><circle class="client" cx="62" cy="58" r="24"/><circle class="designer" cx="160" cy="58" r="24"/><circle class="engineer" cx="258" cy="58" r="24"/><path d="M86 58h50M184 58h50"/><path class="paper" d="M35 101h250v55H35z"/><path class="${contract ? 'accent' : 'muted'}" d="M57 127l10 10 19-24"/><path class="${merge ? 'accent' : 'muted'}" d="M130 127l10 10 19-24"/><path class="${evidence ? 'accent' : 'muted'}" d="M203 127l10 10 19-24"/><text x="37" y="92">CLIENT → DESIGN → ENGINEERING</text>`);
 }
 
-export function case03EndingArt(baseId) {
+export function case03EndingArt(baseId, templateId = 'balanced') {
   const good = baseId === 'C03-VERIFIED';
   const limited = baseId === 'C03-LIMITED';
-  return svg(`case-art case03-art ending-case-art ${good ? 'good' : limited ? 'warn' : 'bad'}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/><circle class="client" cx="75" cy="79" r="31"/><circle class="designer" cx="160" cy="79" r="31"/><circle class="engineer" cx="245" cy="79" r="31"/><path class="paper" d="M45 126h230v38H45z"/>${good ? '<path class="hero-mark" d="M120 83l27 25 57-64"/>' : limited ? '<path class="hero-mark" d="M145 48h30v67h-30zM145 126h30"/>' : '<path class="hero-mark" d="M128 52l64 64M192 52l-64 64"/>'}`);
+  const tone = good ? 'good' : limited ? 'warn' : 'bad';
+  const symbol = good ? '✓' : limited ? '!' : '×';
+  const label = good ? '驗收範圍與證據已完整對齊' : limited ? '限制範圍下交付' : '驗收範圍尚未對齊';
+  const expression = good ? 'relieved' : limited ? 'skeptical' : 'worried';
+  return `<span class="case-art case03-art ending-case-art raster-case-ending ${tone}" style="--ending-image:url('./assets/art/backgrounds/case03-client-room.png')" role="img" aria-label="${label}">${characterPortrait(templateId, expression)}<i class="ending-emblem" aria-hidden="true">${symbol}</i></span>`;
 }
 
 export function case03Tone(result) {

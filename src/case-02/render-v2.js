@@ -5,6 +5,12 @@ import { renderLocalCoachPanel } from '../postgame/coach-ui.js';
 import { renderEndingStage } from '../presentation/ending-stage.js';
 import { case02ActionArt, case02EndingArt, case02StatusArt, case02Tone } from './art.js';
 import { CASE02_ACTIONS } from './rules.js';
+import {
+  case02BoardScene,
+  case02EndingScene,
+  case02SceneForAction,
+  renderCase02Scene,
+} from './scene.js';
 
 export const renderCase02Error = legacy.renderCase02Error;
 
@@ -21,7 +27,8 @@ export function renderCase02Board(state, message = '') {
   const story = state.story;
   const pending = Object.values(story?.commitments ?? {}).filter((value) => value === 'pending' || value === 'surfaced').length;
   const strip = `<div class="story-strip"><strong>剛才的選擇留下什麼</strong><span>${story?.openRecovery ? '失敗開出新救援' : story?.openOpportunity ? '成功後仍可選擇' : pending ? `${pending} 個延後承諾等著結算` : '目前沒有未處理的故事承諾'}</span></div>`;
-  html = html.replace('<div class="action-grid">', `${strip}<div class="action-grid">`);
+  const stage = renderCase02Scene(case02BoardScene(state));
+  html = html.replace('<div class="action-grid">', `${stage}${strip}<div class="action-grid">`);
   for (const actionId of Object.keys(CASE02_ACTIONS)) {
     const button = `data-case02-action="${actionId}"`;
     const buttonAt = html.indexOf(button);
@@ -37,11 +44,15 @@ export function renderCase02Board(state, message = '') {
 }
 
 export function renderCase02Result(state, result) {
-  const actionId = state.log.at(-1)?.actionId ?? 'B03';
+  const actionLog = state.log.at(-1);
+  const actionId = actionLog?.actionId ?? 'B03';
+  const actionOptions = actionLog?.options && typeof actionLog.options === 'object' ? actionLog.options : {};
   const tone = case02Tone(result);
+  const stage = renderCase02Scene(case02SceneForAction(state, actionId, actionOptions, result));
   return legacy.renderCase02Result(state, result)
     .replace('<section class="panel result"', `<section class="panel result result-tone-${tone}"`)
-    .replace('<div class="eyebrow">', `<div class="result-scene">${case02ActionArt(actionId, tone)}</div><div class="eyebrow">`)
+    .replace('<div class="eyebrow">', `<div class="result-scene">${case02ActionArt(actionId, tone, { showCast: false })}</div><div class="eyebrow">`)
+    .replace('<div class="eyebrow">工作結果', `${stage}<div class="eyebrow">工作結果`)
     .replace('<b>1</b>', '<b>你</b><span class="beat-role">玩家 prompt</span>')
     .replace('<b>2</b>', '<b>AI</b><span class="beat-role">agent / 資料回應</span>')
     .replace('<b>3</b>', '<b>?</b><span class="beat-role">追問與整合</span>')
@@ -64,8 +75,8 @@ export function renderCase02Ending(state, settlement, coachView = null) {
   const blockers = state.ending.baseId === 'C02-VERIFIED' ? '' : `<section class="ending-open-issues"><h2>結案時仍公開的限制</h2><ul>${blockersNow.map((item) => `<li>${esc(item)}</li>`).join('') || '<li>本局依選擇保留未完成風險。</li>'}</ul></section>`;
   return shell(renderEndingStage({
     caseLabel: '案件 02 結案', outcomeLabel: labels[ending.baseId] ?? '案件結案', title: ending.title, text: ending.text,
-    art: case02EndingArt(ending.baseId), facets: ending.playFacets ?? [], coach: renderLocalCoachPanel(coachView),
-    footer: `${blockers}<p class="notice">職涯增加 ${settlement?.expGained ?? 0} EXP；跨案卡庫與獎勵 ledger 已保存，短期資源回到大廳時重置。</p>`,
+    art: case02EndingArt(ending.baseId, state.templateId), facets: ending.playFacets ?? [], coach: renderLocalCoachPanel(coachView),
+    footer: `${renderCase02Scene(case02EndingScene(state))}${blockers}<p class="notice">職涯增加 ${settlement?.expGained ?? 0} EXP；跨案卡庫與獎勵 ledger 已保存，短期資源回到大廳時重置。</p>`,
   }));
 }
 
@@ -84,11 +95,12 @@ export function renderCase02Preview(state, actionId, options) {
   let html = legacy.renderCase02Preview(state, actionId, options);
   let preview = null;
   try { preview = previewCase02Action(state, actionId, options); } catch { /* waiting for an explicit choice */ }
-  const value = (key, prefix) => preview ? `${prefix}${preview[key]}` : '待選';
+  const value = (key, formatter) => preview ? formatter(preview[key]) : '待選';
   html = html
-    .replace(/(<span>Token<\/span><strong>)[^<]*/, `$1${value('token', '-')}`)
-    .replace(/(<span>時間<\/span><strong>)[^<]*/, `$1${value('time', '-')}`)
-    .replace(/(<span>壓力<\/span><strong>)[^<]*/, `$1${value('stress', '+')}`);
+    .replace(/(<strong data-preview-cost="token">)[^<]*/, `$1${value('token', legacy.formatPreviewCost)}`)
+    .replace(/(<strong data-preview-cost="time">)[^<]*/, `$1${value('time', legacy.formatPreviewCost)}`)
+    .replace(/(<strong data-preview-cost="stress">)[^<]*/, `$1${value('stress', legacy.formatPreviewDelta)}`);
+  html = html.replace('<div class="receipt">', `${renderCase02Scene(case02SceneForAction(state, actionId, options))}<div class="receipt">`);
 
   if (actionId === 'B01') {
     for (const key of ['idPolicy', 'datePolicy', 'duplicatePolicy']) {

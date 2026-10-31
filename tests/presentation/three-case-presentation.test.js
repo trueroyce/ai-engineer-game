@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createCase02Game, performCase02Action } from '../../src/case-02/engine-v2.js';
 import { case02ActionArt } from '../../src/case-02/art.js';
-import { renderCase02Board, renderCase02Ending, renderCase02Result } from '../../src/case-02/render-v2.js';
+import { renderCase02Board, renderCase02Ending, renderCase02Preview, renderCase02Result } from '../../src/case-02/render-v2.js';
 import { createCase03Game, performCase03Action } from '../../src/case-03/engine.js';
 import { case03ActionArt } from '../../src/case-03/art.js';
 import { renderCase03Board, renderCase03Ending, renderCase03Result } from '../../src/case-03/render-v2.js';
@@ -82,6 +82,34 @@ test('case 02 and 03 result renderers expose friendly labels and outcome-specifi
   assert.match(partial03, /結果 部分成功/);
 });
 
+test('case 02 preview keeps current resources separate from this action cost', () => {
+  const state = createCase02Game({ templateId: 'balanced' });
+  const html = renderCase02Preview(state, 'B01', {
+    idPolicy: 'canonical-map', datePolicy: 'normalize-iso', duplicatePolicy: 'latest-export',
+  });
+  assert.match(html, new RegExp(`aria-label="執行前案件資源"[\\s\\S]*?<span>Token</span><strong>${state.token}</strong>`));
+  assert.match(html, /aria-label="本次執行成本"/);
+  assert.match(html, /<span>Token 成本<\/span><strong data-preview-cost="token">-2<\/strong>/);
+  assert.match(html, /<span>時間成本<\/span><strong data-preview-cost="time">-1<\/strong>/);
+  assert.match(html, /<span>壓力變化<\/span><strong data-preview-cost="stress">0<\/strong>/);
+  assert.doesNotMatch(html, /aria-label="執行前案件資源"[\\s\\S]{0,180}<strong>-2<\/strong>/);
+});
+
+test('case 02 preview formats zero costs neutrally and keeps nonzero signs', () => {
+  const state = createCase02Game({ templateId: 'balanced' });
+  const freeTokenHtml = renderCase02Preview(state, 'B08', {});
+  assert.match(freeTokenHtml, /data-preview-cost="token">0<\/strong>/);
+  assert.match(freeTokenHtml, /data-preview-cost="time">-1<\/strong>/);
+  assert.match(freeTokenHtml, /data-preview-cost="stress">0<\/strong>/);
+  assert.doesNotMatch(freeTokenHtml, /data-preview-cost="(?:token|time|stress)">[+-]0<\/strong>/);
+
+  const paidHtml = renderCase02Preview(state, 'B01', {
+    idPolicy: 'canonical-map', datePolicy: 'normalize-iso', duplicatePolicy: 'latest-export',
+  });
+  assert.match(paidHtml, /data-preview-cost="token">-2<\/strong>/);
+  assert.match(paidHtml, /data-preview-cost="time">-1<\/strong>/);
+});
+
 test('ending badges are prominent visual objects and the coach is absent without capability', () => {
   const badges = renderEndingFacets([
     { id: 'token-rich', title: 'Token 守財奴', text: '金庫還有存貨。' },
@@ -113,6 +141,7 @@ test('case 02 and 03 ending renderers only expose coach actions when capability 
   const shown02 = renderCase02Ending(case02, settlement, coach);
   assert.doesNotMatch(hidden02, /data-analyze-run/);
   assert.match(shown02, /data-analyze-run/);
+  assert.match(hidden02, /player-balanced-worried\.png/);
 
   const case03 = createCase03Game({ templateId: 'balanced' });
   case03.phase = 'ended';
@@ -121,4 +150,5 @@ test('case 02 and 03 ending renderers only expose coach actions when capability 
   const shown03 = renderCase03Ending(case03, settlement, coach);
   assert.doesNotMatch(hidden03, /data-analyze-run/);
   assert.match(shown03, /data-analyze-run/);
+  assert.match(hidden03, /player-balanced-worried\.png/);
 });

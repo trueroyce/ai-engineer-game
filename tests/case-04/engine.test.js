@@ -178,3 +178,22 @@ test('operation replay is idempotent and two rewards unlock at progress 2 and 4 
   assert.equal(state.progression.rewardMilestones[1].status, 'claimed');
   assert.equal(state.progression.runExp, 4);
 });
+
+test('stopping before choosing a rescue strategy produces an honest ending instead of crashing', () => {
+  const state = createCase04Game({
+    templateId: 'balanced',
+    seed: 408,
+    eventRolls: Array(40).fill(1),
+    progressionV2: true,
+  });
+  const ended = performCase04Action(state, 'D09', {
+    intent: 'stop',
+    operationId: 'stop-before-strategy',
+    stateVersion: state.stateVersion,
+  }).state;
+
+  assert.equal(ended.ending.baseId, 'C04-STOP');
+  assert.equal(ended.ending.playFacets[0].id, 'strategy-unselected');
+  assert.equal(ended.ending.playFacets[0].title, '先保留現場，再決定怎麼救');
+  assert.match(ended.ending.playFacets[0].text, /選定救火策略前先止損/);
+});

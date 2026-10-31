@@ -7,6 +7,7 @@ import { CASE04_ACTIONS } from '../case-04/rules.js';
 import { case04PublicView } from '../case-04/engine.js';
 import { TEMPLATES } from '../narrative/rules.js';
 import { RUN_LIMITS, RUN_SCHEMA_VERSION, validateRunRecord } from './run-schema.js';
+import { resolveInitialResourceProvenance } from './resource-provenance.js';
 
 const CASE_META = Object.freeze({
   'case-02': {
@@ -86,10 +87,10 @@ function resultFor(results, used, actionId) {
   return results[index];
 }
 
-function timelineFrom(state, meta) {
+function timelineFrom(state, meta, initialResources) {
   const results = Object.values(state.operationResults ?? {});
   const used = new Set();
-  let previous = { token: 18, stress: 0, time: 12 };
+  let previous = { token: initialResources.token, stress: initialResources.stress, time: initialResources.time };
   let workCount = 0;
   return (state.log ?? []).slice(0, RUN_LIMITS.maxTimeline).map((item, index) => {
     const result = resultFor(results, used, item.actionId);
@@ -113,8 +114,8 @@ function timelineFrom(state, meta) {
         choices: publicChoices(item.options),
       },
       resourceCost: {
-        token: Math.max(0, previous.token - after.token),
-        workTime: Math.min(1, Math.max(0, previous.time - after.time)),
+        token: item.resourceCost?.token ?? Math.max(0, previous.token - after.token),
+        workTime: item.resourceCost?.time ?? Math.max(0, previous.time - after.time),
         overtimeUsed: false,
       },
       observedOutcome: {
@@ -196,7 +197,8 @@ export function buildCareerCaseRunRecord(state) {
   if (!meta || state.phase !== 'ended' || !state.ending) throw new Error('只有已結案的案件 02／03／04 可以輸出');
   const view = meta.view(state);
   const template = TEMPLATES[state.templateId];
-  const timeline = timelineFrom(state, meta);
+  const initialResourceProvenance = resolveInitialResourceProvenance(state);
+  const timeline = timelineFrom(state, meta, initialResourceProvenance.resources);
   const workCount = timeline.filter((item) => item.kind !== 'delivery').length;
   const base = {
     schemaVersion: RUN_SCHEMA_VERSION,
@@ -209,7 +211,7 @@ export function buildCareerCaseRunRecord(state) {
     },
     character: { templateId: state.templateId, name: clipped(template.name, RUN_LIMITS.maxShortText), difficulty: clipped(template.difficulty, RUN_LIMITS.maxShortText) },
     cards: state.equipped.slice(0, RUN_LIMITS.maxCards).map((id) => ({ id, name: clipped(CARDS[id].name, RUN_LIMITS.maxShortText), level: state.cards[id] })),
-    initialResources: { token: 18, stress: 0, time: 12, overtime: 0, workCount: 0 },
+    initialResources: initialResourceProvenance.resources,
     finalResources: resources(state, workCount),
     ending: {
       baseId: state.ending.baseId,

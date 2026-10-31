@@ -1,5 +1,6 @@
 import { ACTIONS, CARDS, SIMULATION_NOTICE, TEMPLATES } from '../narrative/rules.js';
 import { ACTION_SCENES } from '../narrative/narrative-copy.js';
+import { legacyEndingFacet } from '../narrative/ending-facets.js';
 import { renderEndingFacets } from '../presentation/ending-stage.js';
 import {
   actionIllustration,
@@ -15,6 +16,17 @@ import {
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[character]));
+
+function endingFacetDetails(ending) {
+  if (Array.isArray(ending?.playFacets)) {
+    const detailed = ending.playFacets.filter((facet) => facet
+      && typeof facet.id === 'string'
+      && typeof facet.title === 'string' && facet.title.trim()
+      && typeof facet.text === 'string' && facet.text.trim());
+    if (detailed.length) return detailed;
+  }
+  return (ending?.facets ?? []).map(legacyEndingFacet).filter(Boolean);
+}
 
 const PURPOSES = Object.freeze({
   A01: '先用 /plan 把問題拆清楚，不讓寫程式搶跑。',
@@ -212,14 +224,14 @@ export function renderUpgrade(view) {
 
 function renderCoachAnalysis(analysis) {
   if (!analysis) return '';
-  if (analysis.status === 'saving') return '<div class="coach-analysis pending" data-analysis-result><strong>正在安全保存這局…</strong><p>保存成功後才會啟動 Claude。</p></div>';
-  if (analysis.status === 'running') return '<div class="coach-analysis pending" data-analysis-result><strong>Claude 正在讀取這局與公開規則…</strong><p>一次只執行一局；不會自動重送。</p><button class="button secondary" data-cancel-analysis>取消這次分析</button></div>';
-  if (analysis.status === 'error') return `<div class="coach-analysis error" data-analysis-result><strong>這次沒有產生講評</strong><p>${esc(analysis.message)}</p></div>`;
+  if (analysis.status === 'saving') return '<div class="coach-analysis pending" data-analysis-result><strong>正在保存這局紀錄…</strong><p>保存成功後才會啟動 Claude。</p></div>';
+  if (analysis.status === 'running') return '<div class="coach-analysis pending" data-analysis-result><strong>Claude 正在讀取這局紀錄…</strong><p>一次只分析一局，不會自動重送。</p><button class="button secondary" data-cancel-analysis>取消分析</button></div>';
+  if (analysis.status === 'error') return `<div class="coach-analysis error" data-analysis-result><strong>這次沒有完成分析</strong><p>${esc(analysis.message)}</p></div>`;
   if (analysis.status !== 'done' || !analysis.result?.critique) return '';
   const item = analysis.result.critique;
-  const list = (values) => values.length ? `<ul>${values.map((value) => `<li>${esc(value)}</li>`).join('')}</ul>` : '<p>這局沒有足夠公開資料可下判斷。</p>';
-  const usage = analysis.result.usage?.turns ? `本次 ${analysis.result.usage.turns} 個 agent turn` : '本次分析已完成';
-  return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後講評</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>做得不錯</h3>${list(item.strengths)}</section><section><h3>風險與取捨</h3>${list(item.risks)}</section></div><section><h3>下次可直接做</h3>${list(item.nextActions)}</section><p class="muted"><strong>骰運與限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；沿用同局已完成結果，未再次使用額度。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
+  const list = (values) => values.length ? `<ul>${values.map((value) => `<li>${esc(value)}</li>`).join('')}</ul>` : '<p>這局沒有足夠的公開資料可下判斷。</p>';
+  const usage = analysis.result.usage?.turns ? `使用 ${analysis.result.usage.turns} 次模型回合` : '分析已完成';
+  return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後回顧</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>這次做得好的地方</h3>${list(item.strengths)}</section><section><h3>哪個選擇讓事情變難</h3>${list(item.risks)}</section></div><section><h3>下次可以這樣做</h3>${list(item.nextActions)}</section><p class="muted"><strong>運氣與資料限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；這是同一局的快取結果，沒有再次使用模型。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
 }
 
 export function renderEnding(view, options = {}) {
@@ -231,7 +243,7 @@ export function renderEnding(view, options = {}) {
   const actionsStart = coachStart >= 0 ? legacy.indexOf(actionsTag, coachStart) : -1;
   if (coachStart < 0 || actionsStart < 0) return legacy;
   const coachBlock = localCoachAvailable
-    ? '<div class="coach-export"><strong>交給賽後教練</strong><p>直接把這局的公開紀錄存入本機專案 <code>runs</code>；Claude Code 的唯讀 MCP 之後即可讀取。本動作不會自動呼叫模型。</p><p>紀錄不含姓名、帳號、金鑰、seed 或未揭露缺陷。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions">'
+    ? `<div class="coach-export"><strong>交給賽後教練</strong><p>直接把這局的公開紀錄存入本機專案 <code>runs</code>；Claude Code 的唯讀 MCP 之後即可讀取。本動作不會自動呼叫模型。</p><p>紀錄不含姓名、帳號、金鑰、seed 或未揭露缺陷。</p><p class="muted" data-save-status aria-live="polite">${esc(options.localSaveStatus ?? '')}</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions">`
     : '<div class="actions">';
   const withoutLegacyCoach = legacy.slice(0, coachStart)
     + coachBlock
@@ -245,7 +257,7 @@ export function renderEnding(view, options = {}) {
   const renderedActionsStart = renderedCoachStart >= 0 ? withButtons.indexOf(actionsTag, renderedCoachStart) : -1;
   if (renderedCoachStart < 0 || renderedActionsStart < 0) return withButtons;
   const busy = localAnalysis?.status === 'running' || localAnalysis?.status === 'saving';
-  const newCoachBlock = `<div class="coach-export"><strong>本機 Claude 賽後教練</strong><p>按下「分析這局」會直接把這局的公開紀錄存入本機專案 <code>runs</code>，再由受限的 Claude Code 唯讀讀取並把講評顯示在這裡。</p><p><strong>按下即會使用你的 Claude 帳號額度，並把這局公開遊戲資料傳給 Claude 服務。</strong>紀錄不含姓名、帳號、seed、隱藏缺陷或事件權重；Claude 不能改檔、執行命令或讀取其他路徑。</p><p class="muted" data-save-status aria-live="polite"></p><p class="muted" data-export-status aria-live="polite"></p>${renderCoachAnalysis(localAnalysis)}</div><div class="actions">`;
+  const newCoachBlock = `<div class="coach-export"><strong>本機 Claude 賽後教練</strong><p>按下「分析這局」會直接把這局的公開紀錄存入本機專案 <code>runs</code>，再由受限的 Claude Code 唯讀讀取並把講評顯示在這裡。</p><p><strong>按下即會使用你的 Claude 帳號額度，並把這局公開遊戲資料傳給 Claude 服務。</strong>紀錄不含姓名、帳號、seed、隱藏缺陷或事件權重；Claude 不能改檔、執行命令或讀取其他路徑。</p><p class="muted" data-save-status aria-live="polite">${esc(options.localSaveStatus ?? '')}</p><p class="muted" data-export-status aria-live="polite"></p>${renderCoachAnalysis(localAnalysis)}</div><div class="actions">`;
   const withAnalysis = withButtons.slice(0, renderedCoachStart)
     + newCoachBlock
     + withButtons.slice(renderedActionsStart + actionsTag.length);
@@ -257,16 +269,8 @@ export function renderEnding(view, options = {}) {
 
 function renderEndingWithLegacyCoach(view, options = {}) {
   const outcomeLabels = { E01: '正式交付', E02: '正式交付', E03: '正式交付', E04: '有限試用', E05: '展示原型', E06: '正式交付', E07: '進度交接', E08: '主動停止' };
-  const facetLabels = { recovered: '修復後交付', 'high-stress': '高壓完成', 'on-time': '期限內完成', 'token-rich': 'Token 守財奴', 'token-gravekeeper': '額度的守墓人' };
-  const facetCopy = {
-    recovered: '跌過一跤，但你把證據、修正與交付重新接回同一條線。',
-    'high-stress': '壓力錶差點把桌面燒穿；成果是真的，咖啡債也是真的。',
-    'on-time': '期限鐘還沒敲響，交付已經先抵達。',
-    'token-rich': 'Token 金庫大門關得比需求還緊：每一枚都守住了。',
-    'token-gravekeeper': '額度安詳長眠；你至少替它留下了一份可追溯交接。',
-  };
-  const facets = renderEndingFacets((view.ending.facets ?? []).map((facet) => ({ id: facet, title: facetLabels[facet], text: facetCopy[facet] })));
+  const facets = renderEndingFacets(endingFacetDetails(view.ending));
   const settlement = options.careerMode ? `<div class="coach-export career-settlement"><strong>職涯已結算</strong><p>本次新增 ${options.expGained ?? 0} EXP；已領過的里程碑不會重複發放。卡庫與融合已保存，Token、壓力與時間到此歸零。</p></div>` : '';
   const next = options.careerMode ? '<a class="button" href="./index.html" data-return-lobby>返回接案大廳</a>' : '<button class="button" data-new>用新種子再接一案</button>';
-  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<details class="ending-rules"><summary>結局怎麼判定？</summary><p>主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p></details>${settlement}<div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button>${next}</div></div></section>`;
+  return `${renderHud(view)}<section class="hero ending ending-${esc(view.ending.baseId.toLowerCase())}" aria-live="polite"><div class="ending-tableau">${endingIllustration(view.ending.baseId, view.ending.facets, view.templateId)}<div class="ending-stamp"><span>案件結算</span><strong>${esc(outcomeLabels[view.ending.baseId])}</strong></div></div><div class="ending-copy"><div class="eyebrow">主要結果：${esc(outcomeLabels[view.ending.baseId])}</div><h1>${esc(view.ending.title)}</h1><p class="story">${esc(view.ending.text)}</p>${facets}<details class="ending-rules"><summary>結局怎麼判定？</summary><p>主要交付結果先由成果與證據決定；資源和歷程只會改變尾聲，不會把沒完成說成完美交付。</p></details>${settlement}<div class="coach-export"><strong>交給賽後教練</strong><p>下載檔只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed 或未揭露缺陷。下載後手動放進專案 <code>runs</code> 資料夾。</p><p class="muted" data-export-status aria-live="polite"></p></div><div class="actions"><button class="button secondary" data-export-run>匯出賽後教練紀錄</button>${next}</div></div></section>`;
 }

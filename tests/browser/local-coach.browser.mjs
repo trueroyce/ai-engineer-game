@@ -28,7 +28,7 @@ function check(name, pass, detail = '') {
 }
 
 function endedState() {
-  let state = createNarrativeGame({ seed: 'browser-local-coach', templateId: 'balanced' });
+  let state = createNarrativeGame({ seed: 'browser-local-coach', templateId: 'beginner' });
   state = performAction(state, 'A01', { operationId: 'browser-coach-a01', stateVersion: state.stateVersion, designate: 'A01-B' }).state;
   state = performAction(state, 'A12', { operationId: 'browser-coach-stop', stateVersion: state.stateVersion, intent: 'stop' }).state;
   return state;
@@ -98,6 +98,8 @@ async function main() {
     const firstBytes = fs.readFileSync(path.join(runs, files[0]));
     const record = JSON.parse(firstBytes.toString('utf8'));
     validateRunRecord(record);
+    check('beginner fresh-start resources survive the UI writer', record.initialResources.time === 14
+      && record.initialResources.token === 28, JSON.stringify(record.initialResources));
     check('saved record excludes hidden engine state', !/"seed"|functionState|eventDecisions|operationResults|"abilities"/.test(firstBytes.toString('utf8')));
     check('成功回讀與 MCP store 一致', (await createRunStore(runs).get(record.runId)).runId === record.runId);
 
@@ -115,6 +117,9 @@ async function main() {
       state: JSON.stringify(window.__AIEG_NARRATIVE_TEST__.state)
     })`);
     check('one-click analysis renders structured critique as text', /合成講評/.test(analysisUi.text) && /事件結果含骰運/.test(analysisUi.text), analysisUi.text);
+    check('approachable critique headings are visible', /這次做得好的地方/.test(analysisUi.text)
+      && /哪個選擇讓事情變難/.test(analysisUi.text)
+      && /下次可以這樣做/.test(analysisUi.text), analysisUi.text);
     check('model text is escaped and does not mutate game state', !analysisUi.injectedImage && analysisUi.state === before, JSON.stringify(analysisUi));
     check('one-click analysis invokes exactly one stub model run', analysisCount === 1, String(analysisCount));
 

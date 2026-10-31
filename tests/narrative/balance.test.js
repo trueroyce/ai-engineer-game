@@ -7,23 +7,26 @@ test('fixed balance cohort separates the two anchors without making beginner suc
   const report = runCohort();
   assert.deepEqual(report.cohort, { seeds: 200, policies: ['clarify-first', 'prototype-first'] });
 
-  const ultimate = report.summary.ultimate.combined;
-  const beginner = report.summary.beginner.combined;
-  assert.ok(ultimate.completionRate >= 0.75, `ultimate completion ${ultimate.completionRate}`);
-  assert.ok(ultimate.perfectRate >= 0.4, `ultimate perfect ${ultimate.perfectRate}`);
-  assert.ok(beginner.completionRate >= 0.05 && beginner.completionRate <= 0.35, `beginner completion ${beginner.completionRate}`);
-  assert.ok(beginner.perfectRate <= 0.15, `beginner perfect ${beginner.perfectRate}`);
-  assert.ok(beginner.successfulSeeds.length > 0, 'beginner must retain reproducible successful routes');
+  const fullIds = new Set(['E01', 'E02', 'E03', 'E06']);
+  const fullRate = (templateId, policy) => {
+    const rows = report.rows.filter((row) => row.templateId === templateId && (policy === 'combined' || row.policy === policy));
+    return rows.filter((row) => fullIds.has(row.ending)).length / rows.length;
+  };
+  const ultimateFull = fullRate('ultimate', 'combined');
+  const beginnerFull = fullRate('beginner', 'combined');
+  assert.ok(ultimateFull >= 0.8, `ultimate full success ${ultimateFull}`);
+  assert.ok(beginnerFull >= 0.25 && beginnerFull <= 0.45, `beginner full success ${beginnerFull}`);
 
   for (const templateId of ['analyst', 'balanced', 'builder', 'verifier']) {
-    const middle = report.summary[templateId].combined;
-    assert.ok(middle.completionRate > beginner.completionRate, `${templateId} must beat beginner`);
-    assert.ok(middle.completionRate < ultimate.completionRate, `${templateId} must remain below ultimate`);
+    const middle = fullRate(templateId, 'combined');
+    assert.ok(middle > beginnerFull, `${templateId} must beat beginner`);
+    assert.ok(middle < ultimateFull, `${templateId} must remain below ultimate`);
   }
 
   for (const policy of report.cohort.policies) {
-    assert.ok(report.summary.ultimate[policy].completionRate > 0.5, `${policy} ultimate should usually finish`);
-    assert.ok(report.summary.beginner[policy].completionRate < 0.4, `${policy} beginner remains hard`);
+    assert.ok(fullRate('ultimate', policy) > 0.8, `${policy} ultimate should usually finish fully`);
+    const beginnerPolicy = fullRate('beginner', policy);
+    assert.ok(beginnerPolicy >= 0.25 && beginnerPolicy <= 0.45, `${policy} beginner should have a credible but demanding full route`);
   }
 });
 

@@ -2,9 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 
-import { RUN_LIMITS, validateRunRecord } from '../postgame/run-schema.js';
+import { isSafeRunId, RUN_LIMITS, validateRunRecord } from '../postgame/run-schema.js';
 
-const RUN_ID = /^[a-z0-9][a-z0-9_-]{7,63}$/;
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
 export class RunStoreError extends Error {
@@ -112,7 +111,7 @@ export function createRunStore(runsDir) {
       return records.slice(0, limit);
     },
     async get(runId) {
-      if (typeof runId !== 'string' || !RUN_ID.test(runId)) throw safeError('invalid_run_id', 'run_id 只接受 8–64 位小寫英數、底線與連字號');
+      if (!isSafeRunId(runId)) throw safeError('invalid_run_id', 'run_id 只接受 8–64 位小寫英數、底線與連字號');
       const records = await scan();
       const record = records.find((item) => item.runId === runId);
       if (!record) throw safeError('run_not_found', `找不到局紀錄：${runId}`);

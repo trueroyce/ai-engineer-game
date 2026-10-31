@@ -11,7 +11,11 @@ import {
 } from '../../src/case-02/engine-v2.js';
 import { CASE02_LIMITS } from '../../src/case-02/rules.js';
 
-const createCase02Game = (options) => createCase02GameV2({ eventRolls: Array(64).fill(1), ...options });
+const createCase02Game = (options) => createCase02GameV2({
+  eventRolls: Array(64).fill(1),
+  rewardDraws: Array(8).fill(['C7', 'C8', 'C9']),
+  ...options,
+});
 
 function act(state, actionId, options = {}, operationId = `${actionId}-${state.stateVersion}`) {
   return performCase02Action(state, actionId, {
@@ -104,10 +108,15 @@ test('初心者可用完整公開流程取得 verified，強角不會遇到隱�
     assert.equal(state.phase, 'ended');
     assert.equal(state.ending.baseId, 'C02-VERIFIED');
     assert.equal(case02PublicView(state).verifiedReady, true);
-    assert.equal(state.timeLeft, 2);
     assert.ok(state.token >= 0);
   }
-  assert.ok(ultimate.token >= beginner.token, '強角保留資源優勢');
+  assert.equal(beginner.timeLeft, 4);
+  assert.equal(ultimate.timeLeft, 3);
+  assert.equal(beginner.initialResources.token, 22);
+  assert.equal(ultimate.initialResources.token, 21);
+  assert.equal(beginner.initialResources.time, 14);
+  assert.equal(ultimate.initialResources.time, 13);
+  assert.ok(ultimate.token >= beginner.token, '固定相同獎勵後，強角不會被隱藏加難');
 });
 
 test('失敗、有限交付與止損都是實際結局，不會偽裝成成功', () => {
@@ -209,8 +218,8 @@ test('案 2 EXP 與卡獎勵 ledger 防重領；重開只重設案內資源', ()
     equipped: replay.career.equipped,
     rewardLedger: replay.career.rewardLedger,
   });
-  assert.equal(restarted.token, CASE02_LIMITS.token);
-  assert.equal(restarted.timeLeft, CASE02_LIMITS.deadline);
+  assert.equal(restarted.token, CASE02_LIMITS.token + 4);
+  assert.equal(restarted.timeLeft, CASE02_LIMITS.deadline + 2);
   assert.equal(restarted.stress, 0);
   assert.deepEqual(restarted.cards, replay.career.cards);
   assert.deepEqual(restarted.equipped, replay.career.equipped);

@@ -114,6 +114,7 @@ export function simulate(seed, templateId, policy) {
   const rewardWorkCounts = [];
   let operation = 0;
   let stalled = 0;
+  const actionLog = [];
 
   while (state.phase === 'playing' && operation < 60) {
     while (state.pendingUpgrades.length) state = chooseCard(state, policy, rewardWorkCounts);
@@ -128,6 +129,7 @@ export function simulate(seed, templateId, policy) {
     if (actionId !== 'A12' && !preview.cached && view.resources.token < preview.cost) {
       const restCost = view.resources.time === 0 ? 1 : 0;
       if (view.resources.token >= restCost && view.canRest) {
+        actionLog.push({ type: 'rest' });
         state = rest(state, { operationId: `${seed}-${policy}-rest-${++operation}`, stateVersion: state.stateVersion }).state;
         continue;
       }
@@ -136,6 +138,7 @@ export function simulate(seed, templateId, policy) {
       continue;
     }
     const beforeVersion = state.stateVersion;
+    actionLog.push({ type: 'action', actionId, options: structuredClone(options) });
     const out = performAction(state, actionId, { ...options, operationId: `${seed}-${policy}-${++operation}`, stateVersion: state.stateVersion });
     state = out.state;
     recordAction(memory, actionId, options);
@@ -168,6 +171,7 @@ export function simulate(seed, templateId, policy) {
     phase: state.phase,
     claimedThresholds: [...state.claimedThresholds],
     pendingUpgrades: [...state.pendingUpgrades],
+    actionLog,
   };
 }
 

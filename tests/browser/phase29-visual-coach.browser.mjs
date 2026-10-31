@@ -25,6 +25,7 @@ async function resultVisual(page) {
     const scene = document.querySelector('.result-scene .case-art');
     const panelStyle = getComputedStyle(panel);
     const sceneStyle = getComputedStyle(scene);
+    const stampStyle = getComputedStyle(panel, '::after');
     return {
       className: panel.className,
       text: panel.innerText,
@@ -32,19 +33,34 @@ async function resultVisual(page) {
       panelBorder: panelStyle.borderColor,
       panelShadow: panelStyle.boxShadow,
       sceneBackground: sceneStyle.backgroundColor,
-      actor: document.querySelector('.actor-name')?.textContent ?? '',
-      dialogue: document.querySelector('.actor-line')?.textContent ?? '',
+      stampContent: stampStyle.content,
+      stampColor: stampStyle.color,
+      hudLabel: document.querySelector('.hud')?.getAttribute('aria-label') ?? '',
+      actor: document.querySelector('.scene-dialogue p > strong')?.textContent ?? '',
+      dialogue: document.querySelector('.scene-dialogue p')?.textContent ?? '',
     };
   })()`);
 }
 
-async function chooseCase02Contract(page) {
+async function chooseCase02Contract(page, previewShot = null) {
   await page.click('[data-case02-action="B01"]');
   for (const [key, value] of Object.entries({ idPolicy: 'canonical-map', datePolicy: 'normalize-iso', duplicatePolicy: 'latest-export' })) {
     await page.eval(`(() => { const node = document.querySelector('[data-case02-option="${key}"]'); node.value = '${value}'; node.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   }
+  const preview = await page.eval(`({
+    hudLabel: document.querySelector('.hud')?.getAttribute('aria-label'),
+    hudToken: document.querySelector('.hud .stat strong')?.textContent,
+    stateToken: String(window.__AIEG_CASE02_TEST__.state.token),
+    receiptLabel: document.querySelector('.receipt')?.getAttribute('aria-label'),
+    tokenLabel: document.querySelector('[data-preview-cost="token"]')?.previousElementSibling?.textContent,
+    tokenCost: document.querySelector('[data-preview-cost="token"]')?.textContent,
+    timeLabel: document.querySelector('[data-preview-cost="time"]')?.previousElementSibling?.textContent,
+    stressLabel: document.querySelector('[data-preview-cost="stress"]')?.previousElementSibling?.textContent,
+  })`);
+  if (previewShot) await shot(page, previewShot);
   await page.click('[data-case02-confirm]');
   await page.waitFor('document.querySelectorAll(".beat-role").length === 4');
+  return preview;
 }
 
 async function chooseCase03Scope(page) {
@@ -115,19 +131,44 @@ async function main() {
     check('case 02 360px board keeps controls reachable without horizontal overflow', !mobile02.overflow && mobile02.buttons.every((height) => height >= 43.5), JSON.stringify(mobile02));
     await shot(page, '02b-case02-board-360');
     await page.setViewport(1280, 900, false);
+    await page.click('[data-case02-action="B08"]');
+    const zeroCostsDesktop = await page.eval(`({
+      token: document.querySelector('[data-preview-cost="token"]')?.textContent,
+      time: document.querySelector('[data-preview-cost="time"]')?.textContent,
+      stress: document.querySelector('[data-preview-cost="stress"]')?.textContent,
+    })`);
+    check('case 02 zero costs use neutral zero while nonzero costs keep their sign', zeroCostsDesktop.token === '0'
+      && zeroCostsDesktop.time === '-1' && zeroCostsDesktop.stress === '0', JSON.stringify(zeroCostsDesktop));
+    await shot(page, '02c-case02-zero-cost-desktop');
+    await page.setViewport(390, 844, true);
+    const zeroCostsMobile = await page.eval(`({
+      overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      values: [...document.querySelectorAll('[data-preview-cost]')].map((node) => node.textContent),
+    })`);
+    check('case 02 zero-cost receipt stays readable at 390px', !zeroCostsMobile.overflow
+      && zeroCostsMobile.values.join(',') === '0,-1,0', JSON.stringify(zeroCostsMobile));
+    await shot(page, '02c-case02-zero-cost-390');
+    await page.click('[data-case02-cancel]');
+    await page.setViewport(1280, 900, false);
     const initial02 = await page.eval('window.__AIEG_CASE02_TEST__.state');
     await page.eval(`(() => { const state = window.__AIEG_CASE02_TEST__.state; state.rng.event = { kind: 'injected', values: Array(16).fill(1), cursor: 0 }; window.__AIEG_CASE02_TEST__.setState(state); })()`);
-    await chooseCase02Contract(page);
+    const preview02 = await chooseCase02Contract(page, '02c-case02-preview-resources');
+    check('case 02 preview separates before-state from this action cost', preview02.hudLabel === '執行前案件資源'
+      && preview02.hudToken === preview02.stateToken && preview02.receiptLabel === '本次執行成本'
+      && preview02.tokenLabel === 'Token 成本' && /^-\d+$/.test(preview02.tokenCost)
+      && preview02.timeLabel === '時間成本' && preview02.stressLabel === '壓力變化', JSON.stringify(preview02));
     const success02 = await resultVisual(page);
     check('case 02 result names player, agent, integration and consequence beats', (await page.eval('document.querySelectorAll(".beat-role").length')) === 4);
-    check('case 02 success has a named speaker and friendly outcome label', success02.className.includes('result-tone-good') && success02.actor && success02.dialogue && success02.text.includes('結果 成功') && !success02.text.includes('結果 success'), JSON.stringify(success02));
-    await shot(page, '02c-case02-success-result');
+    check('case 02 success is one successful step, not a project-ending claim', success02.className.includes('result-tone-good') && success02.actor && success02.dialogue && success02.text.includes('結果 成功') && !success02.text.includes('結果 success') && success02.stampContent.includes('本步成功') && !success02.stampContent.includes('結案') && success02.hudLabel === '執行後案件資源', JSON.stringify(success02));
+    await page.eval('document.querySelector(".result")?.scrollIntoView({ block: "start" })');
+    await shot(page, '02d-case02-success-result');
     await page.click('[data-case02-continue]');
     await page.eval(`(() => { const state = ${JSON.stringify(initial02)}; state.rng.event = { kind: 'injected', values: Array(16).fill(100), cursor: 0 }; window.__AIEG_CASE02_TEST__.setState(state); })()`);
     await chooseCase02Contract(page);
     const failure02 = await resultVisual(page);
-    check('case 02 failure changes the rendered panel and scene, not only a class name', failure02.className.includes('result-tone-bad') && failure02.text.includes('結果 未成功') && success02.panelBackground !== failure02.panelBackground && success02.panelBorder !== failure02.panelBorder && success02.sceneBackground !== failure02.sceneBackground, JSON.stringify({ success02, failure02 }));
-    await shot(page, '02d-case02-failure-result');
+    check('case 02 failure changes the visible result stamp, scene and dialogue', failure02.className.includes('result-tone-bad') && failure02.text.includes('結果 未成功') && failure02.stampContent.includes('本步未成') && success02.stampContent !== failure02.stampContent && success02.stampColor !== failure02.stampColor && success02.sceneBackground !== failure02.sceneBackground && success02.dialogue !== failure02.dialogue, JSON.stringify({ success02, failure02 }));
+    await page.eval('document.querySelector(".result")?.scrollIntoView({ block: "start" })');
+    await shot(page, '02e-case02-failure-result');
     await page.click('[data-case02-continue]');
     await page.click('[data-case02-action="B09"]');
     await page.click('input[value="stop"]');
@@ -158,13 +199,13 @@ async function main() {
     await chooseCase03Scope(page);
     const success03 = await resultVisual(page);
     check('case 03 result names player, client/NPC, collaboration and consequence beats', (await page.eval('document.querySelectorAll(".beat-role").length')) === 4);
-    check('case 03 success has a named speaker and friendly outcome label', success03.className.includes('result-tone-good') && success03.actor && success03.dialogue && success03.text.includes('結果 成功') && !success03.text.includes('結果 success'), JSON.stringify(success03));
+    check('case 03 success is one successful step, not a project-ending claim', success03.className.includes('result-tone-good') && success03.actor && success03.dialogue && success03.text.includes('結果 成功') && !success03.text.includes('結果 success') && success03.stampContent.includes('本步成功') && !success03.stampContent.includes('結案'), JSON.stringify(success03));
     await shot(page, '05c-case03-success-result');
     await page.click('[data-case03-continue]');
     await page.eval(`(() => { const state = ${JSON.stringify(initial03)}; state.rng.event = { kind: 'injected', values: Array(16).fill(100), cursor: 0 }; window.__AIEG_CASE03_TEST__.setState(state); })()`);
     await chooseCase03Scope(page);
     const failure03 = await resultVisual(page);
-    check('case 03 failure changes the rendered panel and scene, not only a class name', failure03.className.includes('result-tone-bad') && failure03.text.includes('結果 未成功') && success03.panelBackground !== failure03.panelBackground && success03.panelBorder !== failure03.panelBorder && success03.sceneBackground !== failure03.sceneBackground, JSON.stringify({ success03, failure03 }));
+    check('case 03 failure changes the visible result stamp, scene and dialogue', failure03.className.includes('result-tone-bad') && failure03.text.includes('結果 未成功') && failure03.stampContent.includes('本步未成') && success03.stampContent !== failure03.stampContent && success03.stampColor !== failure03.stampColor && success03.sceneBackground !== failure03.sceneBackground && success03.dialogue !== failure03.dialogue, JSON.stringify({ success03, failure03 }));
     await shot(page, '05d-case03-failure-result');
     await page.click('[data-case03-continue]');
     await page.click('[data-case03-action="C07"]');

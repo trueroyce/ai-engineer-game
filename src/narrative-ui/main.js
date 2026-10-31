@@ -2,6 +2,7 @@ import { createNarrativeGame, chooseUpgrade, isActionResultCurrent, openingChoic
 import { actionOptionsForNewWork, projectNarrativeView } from '../narrative/view.js';
 import { analyzeRun, buildRunRecord, cancelRunAnalysis, downloadRunRecord, saveRunRecord } from '../postgame/run-export.js';
 import { loadCareer, reserveRun, saveActiveRun, saveCareer, settleCase } from '../career/state-v2.js';
+import { captureActiveControl, focusChangedScreen } from '../presentation/screen-transition.js';
 import { renderCards, renderEnding, renderIntro, renderPlay, renderPreview, renderResult, renderUpgrade } from './render.js';
 
 const root = document.querySelector('#app');
@@ -22,6 +23,7 @@ let operation = 0;
 let careerSettlement = null;
 let localCoach = null;
 let localAnalysis = null;
+let localSaveStatus = '';
 let analysisRequest = 0;
 
 if (career?.activeRun?.caseId === 'case-01') {
@@ -32,6 +34,7 @@ if (career?.activeRun?.caseId === 'case-01') {
   screen = 'career-error';
   careerLoad.reason = `已有 ${career.activeRun.caseId} 進行中的案件；請先回到該案件。`;
 }
+let renderedScreen = screen;
 
 function persistActive() {
   if (!career || !state?.runId || state.ending) return;
@@ -41,6 +44,8 @@ function persistActive() {
 function view() { return state ? projectNarrativeView(state) : null; }
 
 function render() {
+  const screenChanged = screen !== renderedScreen;
+  const restoreControl = captureActiveControl(root, screenChanged);
   const v = view();
   if (screen === 'career-error') root.innerHTML = `<section class="hero screen"><div class="stage-copy"><div class="eyebrow">職涯模式無法開始</div><h1>先回大廳處理存檔</h1><p class="lede">${careerLoad?.reason ?? '目前沒有可用的職涯。'} 原存檔不會在這裡被覆寫。</p><div class="actions"><a class="button" href="./index.html">返回接案大廳</a><a class="button secondary" href="./case-01.html">改玩第一版單案</a></div></div></section>`;
   else if (screen === 'intro') root.innerHTML = renderIntro(setup);
@@ -55,6 +60,7 @@ function render() {
       expGained: careerSettlement?.expGained ?? 0,
       localCoachAvailable: Boolean(localCoach),
       localAnalysis,
+      localSaveStatus,
     });
   }
   else if (screen === 'upgrade' && v.pendingUpgrade) root.innerHTML = renderUpgrade(v);
@@ -65,11 +71,9 @@ function render() {
     root.querySelectorAll('[data-option]').forEach((el) => { if (actionOptions[el.dataset.option] !== undefined) el.value = actionOptions[el.dataset.option]; });
     root.querySelectorAll('[data-option-check]').forEach((el) => { el.checked = Boolean(actionOptions[el.dataset.optionCheck]); });
   }
-  const result = root.querySelector('.result');
-  if (result) {
-    result.scrollIntoView({ block: 'start' });
-    result.focus({ preventScroll: true });
-  }
+  focusChangedScreen(root, screenChanged);
+  if (!screenChanged) restoreControl?.();
+  renderedScreen = screen;
 }
 
 function nextOperation() { operation += 1; return `ui-${operation}`; }
@@ -93,11 +97,13 @@ function start() {
 async function analyzeCurrentRun(reanalyze = false) {
   const request = ++analysisRequest;
   localAnalysis = { status: 'saving' };
+  localSaveStatus = '正在安全寫入本機 runs…';
   render();
   try {
     const record = buildRunRecord(state);
     const saved = await saveRunRecord(record, localCoach);
     if (request !== analysisRequest) return;
+    localSaveStatus = saved.idempotent ? `這局已在本機 runs：${saved.runId}` : `已存入本機 runs：${saved.runId}`;
     localAnalysis = { status: 'running', runId: saved.runId };
     render();
     const result = await analyzeRun(saved.runId, localCoach, { reanalyze });
@@ -105,6 +111,7 @@ async function analyzeCurrentRun(reanalyze = false) {
     localAnalysis = { status: 'done', runId: saved.runId, result };
   } catch (error) {
     if (request !== analysisRequest) return;
+    if (localAnalysis?.status === 'saving') localSaveStatus = `儲存失敗：${error.message}`;
     localAnalysis = { status: 'error', message: error.message };
   }
   render();
@@ -195,11 +202,13 @@ root.addEventListener('click', async (e) => {
     try {
       const record = buildRunRecord(state);
       const saved = await saveRunRecord(record, localCoach);
-      if (status) status.textContent = saved.idempotent
+      localSaveStatus = saved.idempotent
         ? `這局已在本機 runs：${saved.runId}`
         : `已存入本機 runs：${saved.runId}`;
+      if (status) status.textContent = localSaveStatus;
     } catch (error) {
-      if (status) status.textContent = `儲存失敗：${error.message}`;
+      localSaveStatus = `儲存失敗：${error.message}`;
+      if (status) status.textContent = localSaveStatus;
     } finally {
       saveRun.disabled = false;
     }
@@ -220,7 +229,7 @@ root.addEventListener('click', async (e) => {
   if (e.target.closest('[data-new]')) {
     analysisRequest += 1;
     seed = crypto.randomUUID(); setup = { templateId: 'balanced', draw: openingChoices(seed), selected: [] };
-    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; localAnalysis = null; render();
+    state = null; screen = 'intro'; selectedAction = null; actionOptions = {}; operation = 0; localAnalysis = null; localSaveStatus = ''; render();
   }
 });
 
@@ -242,14 +251,12 @@ window.__AIEG_NARRATIVE_TEST__ = {
   get state() { return structuredClone(state); },
   get view() { return state ? projectNarrativeView(state) : null; },
   exportRunRecord() { return state ? buildRunRecord(state) : null; },
-  setState(next) { state = structuredClone(next); screen = 'play'; render(); },
+  setState(next) { state = structuredClone(next); screen = state.ending ? 'ending' : state.pendingUpgrade ? 'upgrade' : 'play'; render(); },
 };
 
 render();
 
 async function discoverLocalCoach() {
-  const host = globalThis.location?.hostname;
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) return;
   try {
     const response = await fetch('/api/local-coach/capability', {
       headers: { Accept: 'application/json' },

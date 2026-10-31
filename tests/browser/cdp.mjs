@@ -121,6 +121,8 @@ export async function launch({ executable = findBrowser(), width = 1280, height 
 const KEYS = {
   Escape: { code: 'Escape', windowsVirtualKeyCode: 27 },
   Tab: { code: 'Tab', windowsVirtualKeyCode: 9 },
+  ArrowDown: { code: 'ArrowDown', windowsVirtualKeyCode: 40 },
+  ArrowUp: { code: 'ArrowUp', windowsVirtualKeyCode: 38 },
   Enter: { code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
   ' ': { code: 'Space', windowsVirtualKeyCode: 32, text: ' ' },
 };

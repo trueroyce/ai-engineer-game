@@ -1,121 +1,102 @@
-# AI 工程接案遊戲（規則 v0.3-T3）
+# AI 工程接案遊戲
 
-## 本機職涯擴充
+一款以軟體工程決策為核心的繁體中文敘事遊戲。你會選擇職涯模板、裝備工程卡片，在有限 Token、時間與風險下完成四個案件；每個選擇都可能在後續事件與結局回來找你。
 
-接案大廳現在可玩四案：案件 01「管好自己」保留原規則；案件 02「三張表格，一份真相」提供 CSV 契約、模擬 sub-agent 分工、整合債、需求變更、交叉測試與來源追溯；案件 03「大家都說只改一點點」提供客戶決策、設計師／工程師 NPC 協作、介面契約、合併、需求變更與證據重驗；案件 04「昨天還好好的」在補丁、根因、局部重構與相容回滾間處理祖傳系統事故，回滾執行前必須先做資料相容／安全隔離決策，交付提案也要由客戶或產品負責人依公開局勢核准、退回補件或建議縮限。agent 與 NPC 都是確定性的遊戲模擬，不是真多人或背景模型服務，也不能代替負責人核准。
+**公開遊玩：** https://trueroyce.github.io/ai-engineer-game/
 
-職涯資料只保存在瀏覽器 `localStorage`。EXP、卡庫、融合等級與最多三張啟用卡跨案延續；Token、壓力與工作時間每次開案重設。四案都不會在遊玩過程啟動真模型、讀取外部資料或連網。
+## 遊戲內容
+
+- **案件 01｜先管好自己**：把模糊承諾整理成可驗證的工作範圍。
+- **案件 02｜三份資料，一個真相**：處理互相矛盾的 CSV、代理分工與證據鏈。
+- **案件 03｜大家都說「只改一點點」**：面對需求漂移、驗收範圍與版本承諾。
+- **案件 04｜祖傳系統救援**：在時間壓力下處理回滾、資料相容與負責人核准。
+- 6 種職涯模板、18 張工程卡片、角色立繪與表情、4 個場景背景，以及會回應過往選擇的結局。
+- 進度保存在瀏覽器 `localStorage`；重新整理後可延續同一局。
+
+## 快速開始
+
+### 直接遊玩公開版
+
+1. 開啟[公開網頁](https://trueroyce.github.io/ai-engineer-game/)。
+2. 建立職涯，選擇角色模板。
+3. 從 18 張卡片中裝備本案要用的卡。
+4. 進入案件，閱讀場景、成本與風險，再做決策。
+5. 結局頁會顯示結果、特色稱號與本局紀錄。
+
+更完整的操作與四案提示請見[玩家教學](docs/public/player-guide.md)。
+
+### 本機執行
+
+需求：Node.js 24 以上。專案沒有第三方 npm 相依套件。
 
 ```powershell
-npm start
-# 瀏覽 http://127.0.0.1:8080/
-npm run test:browser:case-02
-```
-
-## 本機一鍵 Claude 賽後教練
-
-GitHub Pages 只提供靜態遊戲，完全不顯示教練入口，也不會連到 `localhost`。要使用一鍵講評，請 clone 專案到本機，安裝 Node.js 24 以上與 Claude Code 2.1.310 以上，先在 Claude Code 完成一般訂閱登入，再從專案根目錄啟動：
-
-```powershell
-npm start -- 8081
-```
-
-開啟 `http://127.0.0.1:8081/`，從大廳選任一案件。案件 01、02、03、04 結算後都可按「分析這局」；本機 loopback server 會先把該局公開紀錄保存到固定 `runs/`，再以非互動 Claude Code 呼叫本專案的三個唯讀 MCP 工具，講評直接回到網頁。功能沿用 Claude Code 的既有登入，不需要另填雲端 API key。
-
-按下分析會使用 Claude 帳號額度，且公開遊戲紀錄會傳送給 Claude 服務；這不是離線分析。紀錄不含姓名、帳號、seed、事件權重、隱藏缺陷或完整引擎狀態。橋接停用 Claude 的 Bash、Read、Edit、Web 等內建工具，只載入固定的 `ai_game_runs` 唯讀 MCP，並限制單次執行、turn、估算預算、時間與輸出大小。登入失效、額度不足、MCP 連線失敗、逾時或取消都會顯示失敗，不會假稱完成，也不會自動重試消耗額度。
-
-同一伺服器程序中再次按一般分析會沿用已完成結果；只有按「重新分析（會再次使用額度）」才會再呼叫一次。手動 MCP 流程與資料界線詳見 `docs/mcp/README.md`。
-
-> **保留經典第一版。**
-> `classic.html` 保留原本三案、18 回合、秘密缺陷與完整結算；根入口則是四案職涯版。完整開發規格與驗收紀錄保留在使用者本機，不納入整理後的公開 release。
-
-## 需求
-
-- Node.js 24 以上（本專案以 v24.20.0 開發）。
-- 任一現代瀏覽器（已用 Chrome 與 Edge 驗證）。
-- **不需要安裝任何套件、不需要網路**：沒有 dependencies，介面不載入任何外部資源。
-
-## 啟動（離線）
-
-```
+git clone https://github.com/trueroyce/ai-engineer-game.git
+cd ai-engineer-game
 npm start
 ```
 
-終端機會印出 `http://127.0.0.1:8080/`，用瀏覽器開啟即可。要換埠號：`npm start -- 9000`（Windows PowerShell 亦同）。按 Ctrl+C 停止。
+終端機會顯示本機網址，預設為 `http://127.0.0.1:8080/`。要改用其他連接埠：
 
-目前入口：職涯大廳在 `http://127.0.0.1:8080/`，可選案件 01–04；保留的完整 v1 在 `http://127.0.0.1:8080/classic.html`；敘事案件 01 直達頁在 `http://127.0.0.1:8080/case-01.html`。所有 CLI、agent、NPC 與工程過程都是遊戲模擬，不會在玩家電腦上執行真 CLI 或模型。
+```powershell
+npm start -- 9000
+```
 
-保留的第一版不保存進行中的遊戲；職涯案件 01–04 則把完整 active run 寫入同一網址的瀏覽器 `localStorage`，刷新或關頁後會繼續同一局。案件結束後可把最小公開局紀錄存入本機 `runs/`，但該公開紀錄只供賽後教練唯讀分析，不能取代職涯存檔。
+## 存檔、重玩與結局
 
-## 唯讀 MCP 賽後教練
+- 職涯、卡片與進行中的案件保存在目前瀏覽器和網域的本機儲存空間。
+- 同一案件可重新挑戰；舊版合法存檔會盡量維持相容。
+- 成功、有限交付與失敗都有不同收尾；失敗通常仍會提供有代價的補救路線，而不是只顯示「答錯」。
+- 公開版不會把遊戲紀錄傳到伺服器或外部模型。
 
-以 `npm start` 執行本機版時，案件 01、02、03、04 結束後都可按「存入本機賽後教練」，由同源 loopback server 直接把合法 `ai-engineer-game.run.v1` JSON 寫進固定 `runs/`。四案分別使用已知規則版 `case-01-narrative@2`／`@3`、`case-02-csv@2`、`case-03-booking@1`、`case-04-legacy@1`；未知規則版或案件／規則不相符會被拒絕。檔案只含本局公開遊戲資料，不含姓名、帳號、金鑰、seed、未揭露事件、骰序或完整引擎 state。本機 stdio MCP 可用三個唯讀工具 `list_runs`、`get_run`、`get_rules` 供既有 Claude Code 分析。
+## 本機賽後分析與唯讀 MCP
 
-唯讀 MCP server 本身不呼叫模型、不連網、不需 API key，也不能寫檔、刪檔或執行 shell；「只存到本機」也只經過窄寫入橋接，不會啟動 Claude。只有玩家明確按下「分析這局」時，一鍵分析 bridge 才會啟動受限的非互動 Claude Code，使用帳號額度讀取該局公開紀錄與三個唯讀 MCP 工具。完整安全邊界、真實協定測試與需人工核准的 project-scoped Claude Code 範本請見 `docs/mcp/README.md`。遊戲不會替使用者接受權限。
+GitHub Pages 是純靜態公開版，**不啟用賽後教練、MCP、Claude 呼叫、寫入伺服器或任何 localhost 探測**。這些功能只在你自行 clone 後，以 `npm start` 啟動的 loopback 本機版本使用。
 
-GitHub Pages 等純靜態版本不渲染賽後教練入口，也不包含可寫入本機的設定。
+本機版本可以：
+
+- 把已結束的局存入專案下的 `runs/`；Git 會忽略實際 `*.json` 紀錄。
+- 透過固定的唯讀 MCP 工具 `list_runs`、`get_run`、`get_rules` 讀取紀錄。
+- 在使用者主動按下分析按鈕後，以已登入的 Claude Code 訂閱執行一次分析；沒有登入、額度不足、逾時或 MCP 錯誤時會明確失敗，不會假裝已分析。
+- 只傳送該局必要的工程決策紀錄；不包含姓名、帳號、瀏覽器資料或聊天紀錄。
+
+詳細設定、配額與隱私界線請見[MCP 與本機賽後教練教學](docs/mcp/README.md)。
 
 ## 測試
 
-```
+```powershell
 npm test
-```
-
-執行全部 `node:test` 單元／整合測試（規則、亂數、公式、引擎時序、防重送、視圖遮罩、重播、兩條 18 回合黃金重播、40 種子整局、UI 渲染）。
-
-只跑敘事案件單元測試：
-
-```
-npm run test:narrative
-```
-
-舊的單案切片回歸：
-
-```
-npm run test:browser
-```
-
-完整 Chrome 瀏覽器回歸（含滑鼠、鍵盤、360px、兩條 18 回合整局、提前結算、崩潰、稽核模式與重播）：
-
-```
-npm run test:browser:full
-```
-
-Edge 可執行 `node tests/browser/full.browser.mjs --browser edge`；可見 Chrome 視窗可加 `--headed`。結果與截圖寫入 `docs/testing/artifacts/phase-03/`。
-
-敘事案件 Chrome 回歸可執行 `npm run test:browser:narrative`；Edge 可執行 `node tests/browser/narrative.browser.mjs --browser edge`。結果與截圖寫入 `docs/testing/artifacts/phase-04/`。
-
-唯讀 MCP 與局紀錄匯出（合成資料、真 stdio JSON-RPC 子程序）：
-
-```powershell
+npm run test:browser:career
+npm run test:browser:case-04
+npm run test:browser:phase29
 npm run test:mcp
-```
-
-Chrome 匯出下載回歸：
-
-```powershell
-npm run test:browser:mcp
-```
-
-Edge 可執行 `node tests/browser/mcp-export.browser.mjs --browser edge`。結果、下載檔與截圖寫入 `docs/testing/artifacts/phase-18/`；它是瀏覽器自動化，不是真人試玩。
-
-本機直接存檔橋接的單元／真 HTTP 安全測試與瀏覽器回歸：
-
-```powershell
 npm run test:local-coach
-npm run test:browser:local-coach
 ```
 
-Edge 可執行 `node tests/browser/local-coach.browser.mjs --browser edge`。
+瀏覽器測試需要本機已安裝 Chrome 或 Edge。完整範圍與實際限制請見[測試指南](docs/public/testing.md)。
 
-## 目錄
+## 文件
 
-- `src/core/`：規則資料、亂數、公式、引擎、結算摘要、玩家／稽核視圖、紀錄與重播。瀏覽器與 Node 共用。
-- `src/ui/`：完整三案介面、互動控制器、CLI 教學旁欄與畫面渲染；一般模式只接收玩家視圖。
-- `src/narrative/` 與 `src/narrative-ui/`：案件 01 的隔離規則引擎、敘事內容與精簡介面，不改寫 v1 公式。
-- `src/postgame/`、`src/local-coach/` 與 `src/mcp/`：最小公開局紀錄 schema／投影、本機固定 `runs/` 寫入橋接，以及固定 `runs/` 根的唯讀 stdio MCP。
-- `runs/`：本機遊戲結束後直接存入的局紀錄；`*.json` 不進 Git。
-- `tests/`：測試；`tests/golden/` 是由 canonical 試玩表抄錄的黃金重播資料；`tests/browser/` 是零依賴 CDP 瀏覽器驅動。
-- `docs/`：canonical 文件、決策紀錄、協作與測試紀錄。
+- [玩家教學](docs/public/player-guide.md)
+- [目前規格](docs/public/specification.md)
+- [版本說明](docs/public/release-notes.md)
+- [測試指南](docs/public/testing.md)
+- [Claude Code 指令旁欄查核](docs/public/cli-reference.md)
+- [AI 協作摘要](docs/public/ai-collaboration-summary.md)
+- [貢獻與角色說明](CONTRIBUTORS.md)
+- [MCP 與本機賽後教練](docs/mcp/README.md)
 
-工具卡是遊戲虛構機制，不代表真實 Claude Code 功能。
+## AI 協作與作者界線
+
+這個專案由人類提出方向、選擇設計、試玩並決定是否接受與發布；OpenAI GPT／Codex 協助實作、測試、除錯、文件與視覺資產整合；Anthropic Claude／Claude Code 參與早期規格工作、唯讀美術方向討論與本機賽後分析。所有 AI 輸出都經過人類決策與實際驗證，不能視為自動完成或獨立作者。
+
+GitHub 的 Contributors 圖表只會依 Git commit 的真實作者帳號自動產生。GPT 與 Claude 不是本專案的 GitHub 人類帳號，因此不會以假帳號、假 email、重寫歷史或新增協作者權限來製造圖表紀錄；實際貢獻改以本 README、[`CONTRIBUTORS.md`](CONTRIBUTORS.md) 與[AI 協作摘要](docs/public/ai-collaboration-summary.md)公開說明。
+
+## 誠實限制與公開資料邊界
+
+- 已測試 Chrome、Edge、桌面與 390px 行動版寬度，但不宣稱涵蓋所有瀏覽器、裝置與無限隨機種子。
+- 公開儲存庫只包含遊戲原始碼、靜態資產、公開文件與測試；不包含使用者存檔、實際 `runs/*.json`、憑證、瀏覽器設定檔、原始私人對話或本機開發證據。
+- 公開 Pages 版刻意不提供 MCP 與模型分析。要使用本機功能，請先閱讀文件並自行確認傳送範圍與 Claude Code 配額。
+
+## 授權
+
+本專案目前未另外宣告開源授權；除非儲存庫後續加入授權檔，請不要把「可公開瀏覽」解讀為可任意重製或重新授權。

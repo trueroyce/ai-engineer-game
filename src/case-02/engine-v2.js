@@ -194,16 +194,25 @@ export function performCase02Action(original, actionId, raw = {}) {
     if (original.phase !== 'playing') throw new Error('案件已結束');
     if (original.pendingReward) throw new Error('請先處理目前的職涯獎勵');
     const state = clone(original);
+    const resourcesBefore = { token: state.token, stress: state.stress, time: state.timeLeft };
     state.story = normalizeCase02Story(state.story);
     state.operationPayloads ??= {};
     if (actionId === 'B10' && !state.story.openRecovery) throw new Error('目前沒有待處理的失敗岔路');
     if (actionId === 'B11' && !state.story.openOpportunity) throw new Error('目前沒有待處理的成功誘惑');
     const output = performCase02StoryAction(state, actionId, raw);
+    const resourceCost = { token: output.preview.token, time: output.preview.time, stress: output.preview.stress };
+    const resourceAdjustment = {
+      token: state.token - (resourcesBefore.token - resourceCost.token),
+      time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+      stress: state.stress - Math.min(CASE02_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+    };
     state.stateVersion += 1;
     state.log.push({
       actionId,
       options: { route: raw.route },
       outcome: output.result.outcome,
+      resourceCost,
+      resourceAdjustment,
       resources: { token: state.token, stress: state.stress, time: state.timeLeft },
       dataRevision: state.dataRevision,
     });
@@ -353,7 +362,19 @@ export function performCase02Action(original, actionId, raw = {}) {
   if (actionId === 'B01' && state.lastAttempt?.outcome === 'success') state.preIntegrationDebt = 0;
   if (state.ending) state.ending.playFacets = composeEndingFacets(state);
 
-  if (state.log.length) state.log[state.log.length - 1].outcome = result.outcome ?? result.ending?.baseId ?? null;
+  if (state.log.length) {
+    const log = state.log[state.log.length - 1];
+    log.outcome = result.outcome ?? result.ending?.baseId ?? null;
+    if (oldPreview && newPreview) {
+      log.resourceCost = { token: newPreview.token, time: newPreview.time, stress: newPreview.stress };
+      log.resourceAdjustment = {
+        token: state.token - (original.token - newPreview.token),
+        time: state.timeLeft - (original.timeLeft - newPreview.time),
+        stress: state.stress - Math.min(CASE02_LIMITS.stressCap, original.stress + newPreview.stress),
+      };
+      log.resources = { token: state.token, stress: state.stress, time: state.timeLeft };
+    }
+  }
   state.operationPayloads[operationId] = payload;
   state.operationResults[operationId] = clone(result);
   return { state, result, cached: output.cached };

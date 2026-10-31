@@ -25,8 +25,10 @@ async function newCareer(page, base, templateId) {
   await page.click(`[data-template="${templateId}"]`);
   await page.click('[data-create]');
   await page.waitFor('document.querySelectorAll("[data-starter-card]").length === 3');
-  await page.click('[data-starter-card]');
+  const starter = await page.eval('document.querySelector("[data-starter-card]").dataset.starterCard');
+  await page.click(`[data-starter-card="${starter}"]`);
   await page.waitFor('document.querySelectorAll(".project-start").length === 4');
+  return starter;
 }
 
 async function claim02IfPending(page) {
@@ -51,7 +53,7 @@ async function action02(page, actionId, { select = {}, radio = null } = {}) {
 }
 
 async function runCase02(page, base, templateId) {
-  await newCareer(page, base, templateId);
+  const starter = await newCareer(page, base, templateId);
   await page.click('.project:nth-child(2) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
   await page.click('[data-start-case]');
@@ -74,6 +76,8 @@ async function runCase02(page, base, templateId) {
   const ended = await page.eval('window.__AIEG_CASE02_TEST__.state');
   return {
     templateId,
+    starter,
+    rewardCards: (ended.careerRewards ?? []).map((reward) => reward.cardId ?? reward.id),
     verified,
     ending: ended.ending?.baseId,
     resources: { token: ended.token, time: ended.timeLeft, stress: ended.stress },
@@ -103,7 +107,7 @@ async function action03(page, actionId, radio = null) {
 }
 
 async function runCase03(page, base, templateId) {
-  await newCareer(page, base, templateId);
+  const starter = await newCareer(page, base, templateId);
   await page.click('.project:nth-child(3) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
   await page.click('[data-start-case]');
@@ -134,6 +138,8 @@ async function runCase03(page, base, templateId) {
   const ended = await page.eval('window.__AIEG_CASE03_TEST__.state');
   return {
     templateId,
+    starter,
+    rewardCards: (ended.careerRewards ?? []).map((reward) => reward.cardId ?? reward.id),
     verified: ended.ending?.baseId === 'C03-VERIFIED',
     ending: ended.ending?.baseId,
     resources: { token: ended.token, time: ended.timeLeft, stress: ended.stress },
@@ -151,30 +157,41 @@ async function main() {
   const browser = await launch({ executable: EXE[BROWSER] });
   try {
     const case02StrongRuns = [];
-    for (let index = 0; index < 5 && !case02StrongRuns.some((run) => run.verified); index += 1) {
+    for (let index = 0; index < 20 && !case02StrongRuns.some((run) => run.verified); index += 1) {
       case02StrongRuns.push(await runCase02(browser.page, base, 'ultimate'));
     }
-    const case02Weak = await runCase02(browser.page, base, 'beginner');
+    const case02Weak = [];
+    for (let index = 0; index < 20 && !case02Weak.some((run) => run.verified); index += 1) {
+      case02Weak.push(await runCase02(browser.page, base, 'beginner'));
+    }
     check('natural-case-02', '強角自然骰可達正式交付，未成功的局與弱角仍誠實有限／止損',
-      case02StrongRuns.some((run) => run.verified) && [...case02StrongRuns, case02Weak].every((run) => run.ending && run.resources.token >= 0 && run.resources.time >= 0),
+      case02StrongRuns.some((run) => run.verified) && case02Weak.some((run) => run.verified) && [...case02StrongRuns, ...case02Weak].every((run) => run.ending && run.resources.token >= 0 && run.resources.time >= 0),
       JSON.stringify({ case02StrongRuns, case02Weak }));
     check('natural-case-02', '未注入 RNG、Token、時間或測試 state',
-      [...case02StrongRuns, case02Weak].every((run) => run.rngKind !== 'injected' && run.initialResources.token === 18 && run.initialResources.time === 12),
+      [...case02StrongRuns, ...case02Weak].every((run) => run.rngKind !== 'injected'
+        && run.initialResources.token === (run.templateId === 'beginner' ? 22 : 21)
+        && run.initialResources.time === (run.templateId === 'beginner' ? 14 : 13)),
       JSON.stringify({ case02StrongRuns, case02Weak }));
 
     const case03Runs = [];
-    for (let index = 0; index < 5 && !case03Runs.some((run) => run.verified); index += 1) {
+    for (let index = 0; index < 20 && !case03Runs.some((run) => run.verified); index += 1) {
       case03Runs.push(await runCase03(browser.page, base, 'ultimate'));
     }
-    const case03Weak = await runCase03(browser.page, base, 'beginner');
+    const case03Weak = [];
+    for (let index = 0; index < 20 && !case03Weak.some((run) => run.verified); index += 1) {
+      case03Weak.push(await runCase03(browser.page, base, 'beginner'));
+    }
     check('natural-case-03', '強角自然骰可達正式交付，未成功的局仍誠實有限／止損',
-      case03Runs.some((run) => run.verified) && [...case03Runs, case03Weak].every((run) => run.ending),
+      case03Runs.some((run) => run.verified) && case03Weak.some((run) => run.verified) && [...case03Runs, ...case03Weak].every((run) => run.ending),
       JSON.stringify({ case03Runs, case03Weak }));
     check('natural-case-03', '強弱角色都只使用原始資源與自然 RNG',
-      [...case03Runs, case03Weak].every((run) => run.rngKind !== 'injected' && run.initialResources.token === 18 && run.initialResources.time === 12 && run.resources.token >= 0 && run.resources.time >= 0),
+      [...case03Runs, ...case03Weak].every((run) => run.rngKind !== 'injected'
+        && run.initialResources.token === (run.templateId === 'beginner' ? 22 : 23)
+        && run.initialResources.time === (run.templateId === 'beginner' ? 14 : 15)
+        && run.resources.token >= 0 && run.resources.time >= 0),
       JSON.stringify({ case03Runs, case03Weak }));
     check('natural-case-03', 'completed six-step runs earn both growth rewards; early stops do not',
-      [...case03Runs, case03Weak].every((run) => run.attempts >= 6 ? run.rewards === 2 : run.rewards < 2),
+      [...case03Runs, ...case03Weak].every((run) => run.attempts >= 6 ? run.rewards === 2 : run.rewards < 2),
       JSON.stringify({ case03Runs, case03Weak }));
     const external = browser.page.requests.filter((url) => !url.startsWith('http://127.0.0.1:') && !url.startsWith('data:') && url !== 'about:blank');
     check('privacy', '自然遊玩沒有外部、教練或模型請求', external.length === 0, external.join(', '));

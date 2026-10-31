@@ -41,7 +41,7 @@ test('A06-A describes only the persistence behavior actually observed', () => {
 });
 
 test('A11 process names the public issue actually attempted and marks a repeated paid failure as new', () => {
-  let state = createNarrativeGame({ seed: 'repeat-0', templateId: 'beginner' });
+  let state = createNarrativeGame({ seed: 'repeat-3', templateId: 'balanced' });
   state = act(state, 'A05', { designate: 'A05-B' }).state;
   const knownText = state.knownIssues.find((issue) => issue.status !== 'fixed').text;
   const first = act(state, 'A11', { mode: 'fix' });

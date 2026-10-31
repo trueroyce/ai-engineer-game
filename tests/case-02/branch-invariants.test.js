@@ -41,6 +41,39 @@ test('mapping repair does not erase deleted rows or an unrelated verbal change',
   assert.equal(state.change.contractUpdated, false);
 });
 
+test('failed repair and verification do not clear delayed commitments', () => {
+  let repairState = createCase02Game({ templateId: 'ultimate', eventRolls: [1, 1, 1, 100] });
+  repairState = act(repairState, 'B01', aligned);
+  repairState = act(repairState, 'B02', { strategy: 'two', useRapid: false });
+  repairState = act(repairState, 'B03', { useFastMerge: false });
+  repairState = chooseCase02Reward(repairState, repairState.pendingReward.choices[0]).state;
+  assert.equal(repairState.story.commitments.parallelSchemaDrift, 'surfaced');
+  repairState = act(repairState, 'B05', { mode: 'repair' });
+  assert.equal(repairState.lastAttempt.outcome, 'failure');
+  assert.equal(repairState.story.commitments.parallelSchemaDrift, 'surfaced');
+
+  let testState = createCase02Game({ templateId: 'ultimate', eventRolls: [1, 1, 1, 100] });
+  testState = act(testState, 'B01', aligned);
+  testState = act(testState, 'B02', { strategy: 'solo', useRapid: false });
+  testState = act(testState, 'B03', { useFastMerge: false });
+  testState = chooseCase02Reward(testState, testState.pendingReward.choices[0]).state;
+  testState = act(testState, 'B11', { route: 'gamble' });
+  assert.equal(testState.story.commitments.extraSource, 'pending');
+  testState = act(testState, 'B06', { scope: 'full' });
+  assert.equal(testState.lastAttempt.outcome, 'failure');
+  assert.equal(testState.story.commitments.extraSource, 'pending');
+
+  let traceState = createCase02Game({ templateId: 'ultimate', eventRolls: [1, 1, 1, 100] });
+  traceState = act(traceState, 'B01', aligned);
+  traceState = act(traceState, 'B02', { strategy: 'solo', useRapid: false });
+  traceState = act(traceState, 'B03', { useFastMerge: false });
+  traceState = chooseCase02Reward(traceState, traceState.pendingReward.choices[0]).state;
+  traceState = act(traceState, 'B11', { route: 'gamble' });
+  traceState = act(traceState, 'B07');
+  assert.equal(traceState.lastAttempt.outcome, 'failure');
+  assert.equal(traceState.story.commitments.extraSource, 'pending');
+});
+
 test('existing cards open semantic routes while cardless recovery remains available', () => {
   const cardless = createCase02Game({ templateId: 'balanced' });
   cardless.story.openRecovery = { sourceAction: 'B01' };

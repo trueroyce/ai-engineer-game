@@ -65,6 +65,38 @@ async function case03Action(page, id, choice = null) {
   return page.text();
 }
 
+async function auditMobileStageTransition(page, actionSelector, confirmSelector, cancelSelector, label) {
+  await page.setViewport(390, 844, true);
+  await page.eval('scrollTo(0, document.body.scrollHeight)');
+  await page.click(actionSelector);
+  await page.waitFor(`document.querySelector(${JSON.stringify(confirmSelector)})`);
+  await page.waitFor("document.activeElement?.matches('[tabindex=\"-1\"]') === true");
+  const metrics = await page.eval(`(() => { const h1 = document.querySelector('.preview h1, .panel.preview h1'); const rect = h1?.getBoundingClientRect(); return { scrollY, top: rect?.top, bottom: rect?.bottom, height: innerHeight, focused: document.activeElement?.matches('[tabindex="-1"]') === true }; })()`);
+  check(label, metrics.top >= 0 && metrics.bottom <= metrics.height && metrics.focused, JSON.stringify(metrics));
+  await page.click(cancelSelector);
+  await page.setViewport(1280, 900, false);
+}
+
+async function auditKeyboardRepaint(page, actionSelector, controlSelector, key, cancelSelector, label) {
+  await page.click(actionSelector);
+  await page.waitFor(`document.querySelector(${JSON.stringify(controlSelector)})`);
+  await page.tabTo(controlSelector);
+  await page.eval('scrollTo(0, 180)');
+  const before = await page.eval(`({ value: document.querySelector(${JSON.stringify(controlSelector)}).value, scrollY })`);
+  await page.press(key);
+  await page.waitFor(`document.activeElement === document.querySelector(${JSON.stringify(controlSelector)})`);
+  const after = await page.eval(`({
+    value: document.querySelector(${JSON.stringify(controlSelector)}).value,
+    checked: document.querySelector(${JSON.stringify(controlSelector)}).checked,
+    scrollY,
+    focused: document.activeElement === document.querySelector(${JSON.stringify(controlSelector)})
+  })`);
+  await page.press('Tab');
+  const afterTab = await page.eval(`({ tag: document.activeElement?.tagName, inside: document.querySelector('#app').contains(document.activeElement) })`);
+  check(label, (after.value !== before.value || after.checked) && after.focused && after.scrollY === before.scrollY && afterTab.inside && afterTab.tag !== 'BODY', JSON.stringify({ before, after, afterTab }));
+  await page.click(cancelSelector);
+}
+
 async function claim03(page, slot) {
   await page.waitFor('document.querySelectorAll("[data-case03-reward]").length === 3');
   check('case-03', `第 ${slot} 次成長是三選一`, (await page.eval('document.querySelectorAll("[data-case03-reward]").length')) === 3);
@@ -106,7 +138,10 @@ async function case02(page, base) {
   await page.click('.project:nth-child(2) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
   await page.click('[data-start-case]');
+  await page.waitFor('window.__AIEG_CASE02_TEST__?.state');
   await page.eval(`(() => { const s = window.__AIEG_CASE02_TEST__.state; s.token = 30; s.timeLeft = 30; s.rng.event = { kind:'injected', values:[100,1,100,1,...Array(40).fill(1)], cursor:0 }; window.__AIEG_CASE02_TEST__.setState(s); })()`);
+  await auditMobileStageTransition(page, '[data-case02-action="B01"]', '[data-case02-confirm]', '[data-case02-cancel]', 'case-02 390px 階段切換讓預覽標題與焦點回到視口');
+  await auditKeyboardRepaint(page, '[data-case02-action="B01"]', '[data-case02-option="idPolicy"]', 'ArrowDown', '[data-case02-cancel]', 'case-02 select change preserves focus, scroll and the next Tab stop');
   const contract = { select: { idPolicy:'canonical-map', datePolicy:'normalize-iso', duplicatePolicy:'latest-export' } };
   const failed = await case02Action(page, 'B01', contract);
   const repeated = await case02Action(page, 'B01', contract);
@@ -133,7 +168,10 @@ async function case03(page, base) {
   await page.click('.project:nth-child(3) .project-start');
   await page.waitFor('document.querySelector("[data-start-case]")');
   await page.click('[data-start-case]');
+  await page.waitFor('window.__AIEG_CASE03_TEST__?.state');
   await page.eval(`(() => { const s = window.__AIEG_CASE03_TEST__.state; s.token = 30; s.timeLeft = 30; s.rng.event = { kind:'injected', values:[100,1,100,1,...Array(40).fill(1)], cursor:0 }; window.__AIEG_CASE03_TEST__.setState(s); })()`);
+  await auditMobileStageTransition(page, '[data-case03-action="C01"]', '[data-case03-confirm]', '[data-case03-cancel]', 'case-03 390px 階段切換讓預覽標題與焦點回到視口');
+  await auditKeyboardRepaint(page, '[data-case03-action="C01"]', 'input[name="scope"][value="core"]', ' ', '[data-case03-cancel]', 'case-03 radio change preserves focus, scroll and the next Tab stop');
   const failed = await case03Action(page, 'C01', 'full');
   const repeated = await case03Action(page, 'C01', 'full');
   const repeatedAttempt = await page.eval('window.__AIEG_CASE03_TEST__.state.lastAttempt');

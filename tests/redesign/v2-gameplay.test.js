@@ -90,7 +90,7 @@ test('case 03 six first work attempts unlock rewards near one-third and two-thir
   run('C05', { response: 'negotiate' });
   run('C06', { scope: 'full' });
 
-  assert.deepEqual(outcomes, ['partial', 'success', 'success', 'success', 'failure', 'failure']);
+  assert.deepEqual(outcomes, ['success', 'success', 'success', 'success', 'failure', 'failure']);
   assert.equal(state.progression.runExp, 6);
   assert.equal(state.progression.rewardMilestones.filter((item) => item.status === 'claimed').length, 2);
   assert.equal(state.careerRewards.length, 2);

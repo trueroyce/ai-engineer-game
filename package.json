@@ -1,8 +1,8 @@
 {
   "name": "ai-engineer-game",
-  "version": "0.1.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "AI 工程接案遊戲（規則 v0.3-T3），瀏覽器單機版；零依賴、可離線啟動。",
+  "description": "AI 工程接案遊戲：四案繁體中文敘事工程模擬；零依賴、可離線啟動。",
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
@@ -13,6 +13,7 @@
     "test:browser:narrative": "node tests/browser/deepening.browser.mjs --browser chrome",
     "test:browser:career": "node tests/browser/redesign.browser.mjs --browser chrome",
     "test:browser:case-02": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:case-02-narrative": "node tests/browser/case-02-narrative.browser.mjs --browser chrome",
     "test:browser:case-03": "node tests/browser/redesign.browser.mjs --browser chrome",
     "test:browser:case-04": "node tests/browser/case-04.browser.mjs --browser chrome",
     "test:browser:redesign": "node tests/browser/redesign.browser.mjs --browser chrome",

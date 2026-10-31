@@ -11,8 +11,11 @@ function badgeArt(id, title) {
 }
 
 export function renderEndingFacets(facets = []) {
-  if (!facets.length) return '';
-  return `<section class="ending-facets" aria-label="本局特色稱號"><div class="eyebrow">本局特色稱號</div><div class="ending-badge-grid">${facets.map((facet) => `<article class="ending-badge">${badgeArt(facet.id, facet.title)}<div><h2>${esc(facet.title)}</h2><p>${esc(facet.text)}</p></div></article>`).join('')}</div></section>`;
+  const visibleFacets = facets.filter((facet) => facet
+    && typeof facet.title === 'string' && facet.title.trim()
+    && typeof facet.text === 'string' && facet.text.trim());
+  if (!visibleFacets.length) return '';
+  return `<section class="ending-facets" aria-label="本局特色稱號"><div class="eyebrow">本局特色稱號</div><div class="ending-badge-grid">${visibleFacets.map((facet) => `<article class="ending-badge">${badgeArt(facet.id, facet.title)}<div><h2>${esc(facet.title)}</h2><p>${esc(facet.text)}</p></div></article>`).join('')}</div></section>`;
 }
 
 export function renderEndingStage({ caseLabel, outcomeLabel, title, text, art, facets = [], coach = '', footer = '', href = './index.html' }) {

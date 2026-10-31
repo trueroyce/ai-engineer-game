@@ -5,8 +5,8 @@ runs/*.json
 .mcp.json
 .claude/settings.local.json
 
-# 瀏覽器回歸產物只留本機，不進公開 release。
-docs/testing/artifacts/
-
 # 瀏覽器下載中的暫存檔。
 *.crdownload
+
+# 本機瀏覽器測試產物與私有開發證據不進公開版。
+docs/testing/artifacts/

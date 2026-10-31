@@ -125,7 +125,7 @@ test('五種結案意圖的預覽與提交共用同一判定，拒絕訊息不�
 });
 
 test('same A11 failure after a paid repair retry is a fresh roll, not stale history cache', () => {
-  let state = createNarrativeGame({ seed: 'repeat-0', templateId: 'beginner' });
+  let state = createNarrativeGame({ seed: 'repeat-3', templateId: 'balanced' });
   state = performAction(state, 'A05', {
     operationId: 'repeat-a05', stateVersion: state.stateVersion, designate: 'A05-B',
   }).state;

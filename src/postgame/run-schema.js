@@ -1,4 +1,23 @@
+import { LIMITS, TEMPLATES } from '../narrative/rules.js';
+import { CASE02_LIMITS } from '../case-02/rules.js';
+import { CASE03_LIMITS } from '../case-03/rules.js';
+import { CASE04_LIMITS } from '../case-04/rules.js';
+import { startingResourcesFor } from './resource-provenance.js';
+
 export const RUN_SCHEMA_VERSION = 'ai-engineer-game.run.v1';
+export const CANONICAL_RUN_ID_PATTERN_SOURCE = '^case0[1-4]-[a-f0-9]{16}$';
+export const SAFE_RUN_ID_PATTERN_SOURCE = '^[a-z0-9][a-z0-9_-]{7,63}$';
+const CANONICAL_RUN_ID = new RegExp(CANONICAL_RUN_ID_PATTERN_SOURCE);
+const SAFE_RUN_ID = new RegExp(SAFE_RUN_ID_PATTERN_SOURCE);
+
+export function isCanonicalRunId(value) {
+  return typeof value === 'string' && CANONICAL_RUN_ID.test(value);
+}
+
+export function isSafeRunId(value) {
+  return typeof value === 'string' && SAFE_RUN_ID.test(value);
+}
+
 export const SUPPORTED_GAME_RULE_VERSIONS = Object.freeze([
   'case-01-narrative@2',
   'case-01-narrative@3',
@@ -30,6 +49,17 @@ export const RUN_LIMITS = Object.freeze({
   maxLongText: 2_400,
 });
 
+const TEMPLATE_IDS = Object.freeze(Object.keys(TEMPLATES));
+export const RUN_RESOURCE_BOUNDS = Object.freeze({
+  maxToken: Math.max(LIMITS.tokenCap, CASE02_LIMITS.tokenCap, CASE03_LIMITS.tokenCap, CASE04_LIMITS.tokenCap),
+  maxStress: Math.max(LIMITS.stressCap, CASE02_LIMITS.stressCap, CASE03_LIMITS.stressCap, CASE04_LIMITS.stressCap),
+  maxTime: Math.max(...['case-01', 'case-02', 'case-03', 'case-04']
+    .flatMap((caseId) => TEMPLATE_IDS.map((templateId) => startingResourcesFor(caseId, templateId).time))),
+  maxOvertime: 2,
+  maxWorkCount: LIMITS.hardWork,
+  maxWorkTimeCost: 3,
+});
+
 export class RunValidationError extends Error {
   constructor(code, message) {
     super(message);
@@ -38,7 +68,6 @@ export class RunValidationError extends Error {
   }
 }
 
-const RUN_ID = /^[a-z0-9][a-z0-9_-]{7,63}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 
 function fail(code, message) { throw new RunValidationError(code, message); }
@@ -74,11 +103,11 @@ function array(value, at, max) {
 function validateResources(value, at) {
   object(value, at);
   exactKeys(value, ['token', 'stress', 'time', 'overtime', 'workCount'], at);
-  integer(value.token, `${at}.token`, 0, 30);
-  integer(value.stress, `${at}.stress`, 0, 10);
-  integer(value.time, `${at}.time`, 0, 12);
-  integer(value.overtime, `${at}.overtime`, 0, 2);
-  integer(value.workCount, `${at}.workCount`, 0, 14);
+  integer(value.token, `${at}.token`, 0, RUN_RESOURCE_BOUNDS.maxToken);
+  integer(value.stress, `${at}.stress`, 0, RUN_RESOURCE_BOUNDS.maxStress);
+  integer(value.time, `${at}.time`, 0, RUN_RESOURCE_BOUNDS.maxTime);
+  integer(value.overtime, `${at}.overtime`, 0, RUN_RESOURCE_BOUNDS.maxOvertime);
+  integer(value.workCount, `${at}.workCount`, 0, RUN_RESOURCE_BOUNDS.maxWorkCount);
 }
 
 function validateProcess(value, at) {
@@ -109,7 +138,7 @@ function validateTimelineItem(value, index) {
   object(value.resourceCost, `${at}.resourceCost`);
   exactKeys(value.resourceCost, ['token', 'workTime', 'overtimeUsed'], `${at}.resourceCost`);
   integer(value.resourceCost.token, `${at}.resourceCost.token`, 0, 30);
-  integer(value.resourceCost.workTime, `${at}.resourceCost.workTime`, 0, 1);
+  integer(value.resourceCost.workTime, `${at}.resourceCost.workTime`, 0, RUN_RESOURCE_BOUNDS.maxWorkTimeCost);
   boolean(value.resourceCost.overtimeUsed, `${at}.resourceCost.overtimeUsed`);
   if (value.observedOutcome !== undefined) {
     object(value.observedOutcome, `${at}.observedOutcome`);
@@ -126,7 +155,7 @@ export function validateRunRecord(record) {
   exactKeys(record, ['schemaVersion', 'runId', 'gameRuleVersion', 'caseId', 'knowledgeBoundary', 'character', 'cards', 'initialResources', 'finalResources', 'ending', 'publicProgress', 'timeline'], 'record');
   if (record.schemaVersion !== RUN_SCHEMA_VERSION) fail('unsupported_schema', '不支援的局紀錄版本');
   string(record.runId, 'runId', 64);
-  if (!RUN_ID.test(record.runId)) fail('invalid_schema', 'runId 格式不合法');
+  if (!isSafeRunId(record.runId)) fail('invalid_schema', 'runId 格式不合法');
   if (!SUPPORTED_GAME_RULE_VERSIONS.includes(record.gameRuleVersion)) fail('unsupported_rule_version', '不支援的規則版本');
   id(record.caseId, 'caseId');
   if (RULE_CASE[record.gameRuleVersion] !== record.caseId) fail('invalid_schema', 'caseId and gameRuleVersion do not match');

@@ -28,7 +28,7 @@ function fakeSpawner(mode, calls) {
   };
 }
 
-function service({ runs, mode = 'success', calls = [], timeoutMs = 2_000, maxStdoutBytes } = {}) {
+function service({ runs, mode = 'success', calls = [], timeoutMs = 2_000, maxStdoutBytes, onAudit } = {}) {
   return createClaudeAnalysisService({
     projectRoot: ROOT,
     runsDir: runs,
@@ -36,6 +36,7 @@ function service({ runs, mode = 'success', calls = [], timeoutMs = 2_000, maxStd
     nodeExecutable: process.execPath,
     spawnImpl: fakeSpawner(mode, calls),
     timeoutMs,
+    onAudit,
     ...(maxStdoutBytes ? { maxStdoutBytes } : {}),
   });
 }
@@ -64,6 +65,26 @@ test('invocation has a fixed cwd, absolute MCP entry, no built-ins, exact readon
   assert.equal(path.isAbsolute(config.mcpServers.ai_game_runs.command), true);
   assert.equal(path.isAbsolute(config.mcpServers.ai_game_runs.args[0]), true);
   assert.equal(config.mcpServers.ai_game_runs.args[0], path.join(ROOT, 'scripts', 'mcp-postgame-coach.mjs'));
+  assert.equal(config.mcpServers.ai_game_runs.env.AIEG_MCP_RUNS_DIR, path.join(ROOT, 'runs'));
+  assert.match(flag('--system-prompt'), /繁體中文/);
+  assert.match(flag('--system-prompt'), /實際發生/);
+  assert.doesNotMatch(flag('--system-prompt'), /�/);
+  const schema = JSON.parse(flag('--json-schema'));
+  assert.equal(schema.properties.nextActions.minItems, 1);
+  assert.equal(schema.properties.nextActions.maxItems, 3);
+});
+
+test('audit hook receives the exact bounded prompt and raw child envelope without changing the result', async (t) => {
+  const { runs, record } = await setup(t, 'analysis-audit');
+  const audits = [];
+  const result = await service({ runs, onAudit: (entry) => audits.push(entry) }).analyze(record.runId);
+  assert.equal(result.runId, record.runId);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].runId, record.runId);
+  assert.match(audits[0].prompt, new RegExp(record.runId));
+  assert.match(audits[0].prompt, /實際結果/);
+  assert.equal(JSON.parse(audits[0].stdout).structured_output.headline, '合成局講評');
+  assert.equal(audits[0].exitCode, 0);
 });
 
 test('successful analysis uses stdin, returns structured data, and same-run retry reuses cache', async (t) => {
@@ -82,6 +103,8 @@ test('successful analysis uses stdin, returns structured data, and same-run retr
   assert.equal(calls[0].options.env.CLAUDE_CODE_OAUTH_TOKEN, undefined);
   assert.equal(calls[0].options.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, '1');
   assert.equal(calls[0].args.some((value) => value.includes(record.runId)), false);
+  const mcpConfig = JSON.parse(calls[0].args[calls[0].args.indexOf('--mcp-config') + 1]);
+  assert.equal(mcpConfig.mcpServers.ai_game_runs.env.AIEG_MCP_RUNS_DIR, path.resolve(runs));
 
   const repeated = await analyzer.analyze(record.runId);
   assert.equal(repeated.reused, true);

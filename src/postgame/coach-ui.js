@@ -87,17 +87,17 @@ function list(values) {
 
 function analysisHtml(analysis) {
   if (!analysis) return '';
-  if (analysis.status === 'saving') return '<div class="coach-analysis pending" data-analysis-result><strong>先安全保存本局…</strong><p>保存成功後才會啟動 Claude。</p></div>';
-  if (analysis.status === 'running') return '<div class="coach-analysis pending" data-analysis-result><strong>Claude 正在讀取本局公開紀錄…</strong><p>一次只分析一局，不會自動重送。</p><button class="button secondary" data-cancel-analysis>取消分析</button></div>';
-  if (analysis.status === 'error') return `<div class="coach-analysis error" data-analysis-result><strong>本次沒有完成分析</strong><p>${esc(analysis.message)}</p></div>`;
+  if (analysis.status === 'saving') return '<div class="coach-analysis pending" data-analysis-result><strong>正在保存這局紀錄…</strong><p>保存成功後才會啟動 Claude。</p></div>';
+  if (analysis.status === 'running') return '<div class="coach-analysis pending" data-analysis-result><strong>Claude 正在讀取這局紀錄…</strong><p>一次只分析一局，不會自動重送。</p><button class="button secondary" data-cancel-analysis>取消分析</button></div>';
+  if (analysis.status === 'error') return `<div class="coach-analysis error" data-analysis-result><strong>這次沒有完成分析</strong><p>${esc(analysis.message)}</p></div>`;
   if (analysis.status !== 'done' || !analysis.result?.critique) return '';
   const item = analysis.result.critique;
-  const usage = analysis.result.usage?.turns ? `使用 ${analysis.result.usage.turns} 個 agent turn` : '分析已完成';
-  return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後回顧</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>做得不錯</h3>${list(item.strengths)}</section><section><h3>風險與盲點</h3>${list(item.risks)}</section></div><section><h3>下局可以試試</h3>${list(item.nextActions)}</section><p class="muted"><strong>運氣與限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；沿用同局快取，沒有再次使用模型。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
+  const usage = analysis.result.usage?.turns ? `使用 ${analysis.result.usage.turns} 次模型回合` : '分析已完成';
+  return `<div class="coach-analysis done" data-analysis-result><div class="eyebrow">Claude 賽後回顧</div><h2>${esc(item.headline)}</h2><p>${esc(item.summary)}</p><div class="coach-columns"><section><h3>這次做得好的地方</h3>${list(item.strengths)}</section><section><h3>哪個選擇讓事情變難</h3>${list(item.risks)}</section></div><section><h3>下次可以這樣做</h3>${list(item.nextActions)}</section><p class="muted"><strong>運氣與資料限制：</strong>${esc(item.luckAndLimits)}</p><p class="muted">${esc(usage)}${analysis.result.reused ? '；這是同一局的快取結果，沒有再次使用模型。' : '。'}</p><button class="button secondary" data-reanalyze-run>重新分析（會再次使用額度）</button></div>`;
 }
 
 export function renderLocalCoachPanel(view) {
   if (!view?.available) return '';
   const busy = ['saving', 'running'].includes(view.analysis?.status);
-  return `<section class="coach-export local-coach-panel"><div class="eyebrow">本機限定</div><h2>Claude 賽後教練</h2><p>只會把這一局已公開的決策、過程、資源與結局寫入固定 <code>runs/</code>，再由三個唯讀 MCP 工具讀取。不包含 seed、事件權重、帳號、金鑰或隱藏真相。</p><p><strong>按下分析會使用你的 Claude 帳戶額度；本次開發測試不會自動按它。</strong></p><p class="muted" data-save-status aria-live="polite">${esc(view.saveStatus)}</p>${analysisHtml(view.analysis)}<div class="actions"><button class="button" data-analyze-run ${busy ? 'disabled' : ''}>分析這局</button><button class="button secondary" data-save-run ${busy ? 'disabled' : ''}>只存到本機</button></div></section>`;
+  return `<section class="coach-export local-coach-panel"><div class="eyebrow">本機限定</div><h2>Claude 賽後教練</h2><p>只會把這一局已公開的決策、過程、資源與結局寫入固定 <code>runs/</code>，再由三個唯讀 MCP 工具讀取。不包含 seed、事件權重、帳號、金鑰或隱藏真相。</p><p><strong>按下分析會使用你的 Claude 帳戶額度；只有你主動操作時才會開始。</strong></p><p class="muted" data-save-status aria-live="polite">${esc(view.saveStatus)}</p>${analysisHtml(view.analysis)}<div class="actions"><button class="button" data-analyze-run ${busy ? 'disabled' : ''}>分析這局</button><button class="button secondary" data-save-run ${busy ? 'disabled' : ''}>只存到本機</button></div></section>`;
 }
