@@ -51,6 +51,21 @@ npm start -- 8091
 
 保持該終端機開啟；按 `Ctrl+C` 停止。
 
+## 舊版獨立啟動
+
+目前首頁只保留四案職涯入口，不再顯示第一版連結；舊版檔案與既有存檔都沒有刪除或搬移。需要第一版三案玩法時，在專案根目錄執行：
+
+```powershell
+.\Start-AIEngineerGame-Legacy.cmd
+```
+
+這個獨立啟動器會沿用同一個 `127.0.0.1:8091` 服務，再開啟 `classic.html`，不會改 port 或清除任何 localStorage。第一版案件 01 仍可直接開啟 `http://127.0.0.1:8091/case-01.html`。
+
+公開 Pages 版同樣不在首頁顯示舊版入口；需要時可分別直接開啟：
+
+- <https://trueroyce.github.io/ai-engineer-game/classic.html>
+- <https://trueroyce.github.io/ai-engineer-game/case-01.html>
+
 ## 本機 HTTP bridge 與 stdio MCP
 
 本機 `npm start -- 8091` 同時提供：

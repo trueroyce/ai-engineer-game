@@ -52,7 +52,7 @@ async function run(page, base) {
     return {
       title: document.querySelector('h1')?.textContent,
       templates: document.querySelectorAll('[data-template]').length,
-      classic: Boolean(document.querySelector('a[href="./classic.html"]')),
+      legacyLinks: document.querySelectorAll('a[href="./classic.html"], a[href="./case-01.html"]').length,
       portraits: portraits.length,
       backgrounds,
       decoded,
@@ -63,7 +63,7 @@ async function run(page, base) {
       })()
     };
   })()`);
-  check('onboarding', '新職涯提供六角色且保留第一版入口', onboarding.templates === 6 && onboarding.classic, JSON.stringify(onboarding));
+  check('onboarding', '新職涯提供六角色且不顯示舊版入口', onboarding.templates === 6 && onboarding.legacyLinks === 0, JSON.stringify(onboarding));
   check('onboarding', '六張職涯立繪實際套用且可解碼', onboarding.portraits === 6 && onboarding.backgrounds.every((value) => value.includes('url(')) && onboarding.decoded.every((asset) => asset.width > 0 && asset.height > 0), JSON.stringify(onboarding));
   check('onboarding', '預選角色卡的文字與底色維持可讀對比', onboarding.selected.text.length > 20 && onboarding.selected.color !== onboarding.selected.background, JSON.stringify(onboarding.selected));
   await shot(page, '00-onboarding-desktop');
@@ -93,11 +93,13 @@ async function run(page, base) {
       text: document.querySelector('#app').textContent,
       activeCardText: document.querySelector('.owned-card.active')?.textContent ?? '',
       activeCardBadge: getComputedStyle(document.querySelector('.owned-card.active'), '::after').content,
+      legacyLinks: document.querySelectorAll('a[href="./classic.html"], a[href="./case-01.html"]').length,
       caseArt: await decodeArt(caseNodes, '--scene-image'),
       cardArt: await decodeArt(cardNodes, '--card-image')
     };
   })()`);
   check('lobby', '案件 01/02/03/04 都有開始入口', lobby.projects === 4 && lobby.starts === 4 && lobby.preparing === 0, JSON.stringify(lobby));
+  check('lobby', '接案大廳不顯示舊版入口', lobby.legacyLinks === 0, JSON.stringify(lobby));
   check('lobby', '四案背景圖實際套用、請求並可解碼', lobby.caseArt.length === 4 && lobby.caseArt.every((asset) => asset.background.includes('url(') && asset.width > 0 && asset.height > 0), JSON.stringify(lobby.caseArt));
   check('lobby', '卡庫插圖實際套用、請求並可解碼', lobby.cardArt.length >= 1 && lobby.cardArt.every((asset) => asset.background.includes('url(') && asset.width > 0 && asset.height > 0), JSON.stringify(lobby.cardArt));
   check('lobby', '已裝備卡只保留一個清楚狀態，不重複點擊提示', lobby.activeCardBadge.includes('已裝備') && !lobby.activeCardText.includes('本案啟用中') && !lobby.activeCardText.includes('點一下'), JSON.stringify(lobby));
