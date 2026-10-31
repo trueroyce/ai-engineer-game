@@ -1,3 +1,5 @@
+import { characterPortrait } from '../narrative-ui/art.js';
+
 const svg = (className, body, viewBox = '0 0 320 190') => `<svg class="${className}" viewBox="${viewBox}" role="img" aria-label="案件 02 資料整合情境插畫">${body}</svg>`;
 
 const scenes = Object.freeze({
@@ -16,11 +18,11 @@ const scenes = Object.freeze({
 });
 
 const cast = Object.freeze({
-  B01: ['資料龜', '欄位先講人話'], B02: ['分工貓', 'agent 不會讀心'], B03: ['合併狐', '三份真相排隊'],
-  B04: ['客服鴿', '17:58 又來了'], B05: ['債務熊', '先還整合債'], B06: ['驗證犬', '跨源才算測過'],
-  B07: ['追溯鼠', '這列從哪裡來'], B08: ['Context 蛙', '先喘一口再合併'], B09: ['交付鳥', '證據才是羽毛'],
-  B10: ['救援桌', '失敗不是只有再按一次'], B11: ['貪心鈕', '成功也要決定何時收手'],
-  B12: ['後果帳', '哪個坑就修哪個坑'],
+  B01: ['小陳｜資料窗口', '先定義哪份才是 final'], B02: ['串串｜模擬 agent', 'agent 不會讀心'], B03: ['串串｜模擬 agent', '三份真相在 join 口碰面'],
+  B04: ['米娜｜客服代表', '17:58 的退款插單'], B05: ['小陳｜資料窗口', '被刪的列不會自己回來'], B06: ['串串｜模擬 agent', '測試只負責照出缺口'],
+  B07: ['小陳｜資料窗口', '這個數字從哪裡來'], B08: ['串串｜模擬 agent', '先喘一口再合併'], B09: ['米娜｜客服代表', '限制要寫在交付上'],
+  B10: ['小陳｜資料窗口', '把失敗縮成可救範圍'], B11: ['米娜｜客服代表', '臨時表也順手帶進去？'],
+  B12: ['串串｜模擬 agent', '早先的決定回來敲門'],
 });
 
 function castFocus(actionId) {
@@ -35,8 +37,8 @@ function toneMark(tone) {
   return '';
 }
 
-export function case02ActionArt(actionId, tone = 'mixed') {
-  return svg(`case-art case02-art tone-${tone}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/>${scenes[actionId] ?? scenes.B03}${castFocus(actionId)}${toneMark(tone)}`);
+export function case02ActionArt(actionId, tone = 'mixed', { showCast = true } = {}) {
+  return svg(`case-art case02-art tone-${tone}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/>${scenes[actionId] ?? scenes.B03}${showCast ? castFocus(actionId) : ''}${toneMark(tone)}`);
 }
 
 export function case02StatusArt(view) {
@@ -45,10 +47,14 @@ export function case02StatusArt(view) {
   return svg('case-art case02-status', `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/><path class="paper" d="M25 35h73v104H25zM123 35h73v104h-73zM221 35h73v104h-73z"/><path d="M38 58h47M38 76h35M136 58h47M136 76h35M234 58h47M234 76h35"/><path class="accent" d="M61 151h198M61 139v23M160 139v23"/>${debtBars}<text x="24" y="26">THREE SOURCES / ONE TRUTH</text>`);
 }
 
-export function case02EndingArt(baseId) {
+export function case02EndingArt(baseId, templateId = 'balanced') {
   const good = baseId === 'C02-VERIFIED';
   const limited = baseId === 'C02-LIMITED';
-  return svg(`case-art case02-art ending-case-art ${good ? 'good' : limited ? 'warn' : 'bad'}`, `<rect class="backdrop" x="7" y="7" width="306" height="176" rx="18"/><path class="paper" d="M34 38h68v97H34zM126 38h68v97h-68zM218 38h68v97h-68z"/><path d="M48 58h40M48 75h31M140 58h40M140 75h31M232 58h40M232 75h31"/><path class="accent" d="M70 148h180M70 135v24M160 135v24M250 135v24"/>${good ? '<path class="hero-mark" d="M121 88l26 25 55-62"/>' : limited ? '<path class="hero-mark" d="M145 61h30v54h-30zM145 124h30"/>' : '<path class="hero-mark" d="M130 65l60 60M190 65l-60 60"/>'}`);
+  const tone = good ? 'good' : limited ? 'warn' : 'bad';
+  const symbol = good ? '✓' : limited ? '!' : '×';
+  const label = good ? '多智慧體資料已驗證' : limited ? '限制條件下完成整合' : '整合結果未通過';
+  const expression = good ? 'relieved' : limited ? 'skeptical' : 'worried';
+  return `<span class="case-art case02-art ending-case-art raster-case-ending ${tone}" style="--ending-image:url('./assets/art/backgrounds/case02-data-room.png')" role="img" aria-label="${label}">${characterPortrait(templateId, expression)}<i class="ending-emblem" aria-hidden="true">${symbol}</i></span>`;
 }
 
 export function case02Tone(result) {

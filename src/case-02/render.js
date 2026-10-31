@@ -6,6 +6,17 @@ import { case02ConsequenceChoices, case02OpportunityChoices, case02RecoveryChoic
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
+export function formatPreviewCost(value) {
+  const amount = Number(value) || 0;
+  return amount === 0 ? '0' : `-${amount}`;
+}
+
+export function formatPreviewDelta(value) {
+  const amount = Number(value) || 0;
+  if (amount === 0) return '0';
+  return amount > 0 ? `+${amount}` : String(amount);
+}
+
 function icon(kind = 'table') {
   const shapes = {
     table: '<rect x="7" y="9" width="50" height="42" rx="5"/><path d="M7 21h50M20 9v42M39 9v42"/>',
@@ -32,8 +43,8 @@ export function renderCase02Intro(career) {
   return shell(`<section class="hero">${icon('merge')}<div class="eyebrow">進階案件 · 不鎖等級</div><h1>三張表格，<br>一份真相</h1><p class="lede">客戶說只是把 customers、invoices、refunds 合在一起。三張表分別使用 customer_id、client_no 和自己的日期格式；17:58 還會多一條退款規則。你可以獨作或派模擬 agent，但最後的契約與交付決策仍是你的。</p><p class="notice">這是遊戲內模擬：不會啟動真 sub-agent、不讀外部 CSV、不呼叫模型或連網。</p><div class="owned"><strong>${esc(template.name)} · 需求 ${template.attrs.A}／工程 ${template.attrs.E}／驗證 ${template.attrs.V}</strong><div>${equipped}</div></div><div class="actions"><button class="primary" data-start-case>讀三張表，開始接案</button></div></section><section><h2>公開來源資訊</h2><div class="source-grid"><article class="source-card"><span class="eyebrow">customers.csv</span><h3>客戶主檔</h3><p><code>customer_id</code><code>email</code><code>created_at</code></p><small>日期：ISO；每位客戶一列。</small></article><article class="source-card"><span class="eyebrow">invoices.csv</span><h3>發票匯出</h3><p><code>client_no</code><code>invoice_date</code><code>amount</code></p><small>日期：YYYY/MM/DD；可能重複匯出同發票。</small></article><article class="source-card"><span class="eyebrow">refunds.csv</span><h3>退款紀錄</h3><p><code>customer_id</code><code>processed_at</code><code>amount</code></p><small>日期：ISO；17:58 會補上截止與原因規則。</small></article></div></section>`);
 }
 
-function hud(view) {
-  return `<div class="hud" aria-label="案件資源"><div class="stat"><span>Token</span><strong>${view.resources.token}</strong></div><div class="stat"><span>壓力</span><strong>${view.resources.stress} / 10</strong></div><div class="stat"><span>工作時間</span><strong>${view.resources.time}</strong></div></div>`;
+function hud(view, label = '目前案件資源') {
+  return `<div class="hud" aria-label="${label}"><div class="stat"><span>Token</span><strong>${view.resources.token}</strong></div><div class="stat"><span>壓力</span><strong>${view.resources.stress} / 10</strong></div><div class="stat"><span>工作時間</span><strong>${view.resources.time}</strong></div></div>`;
 }
 
 function status(view) {
@@ -98,7 +109,7 @@ export function renderCase02Preview(state, actionId, options) {
   try { preview = previewCase02Action(state, actionId, options); } catch { preview = { token: 0, time: 0, stress: 0 }; }
   const extra = actionId === 'B02' ? `<div><span>brief 品質</span><strong>${preview.briefScore ?? 0}</strong></div><div><span>預估整合債</span><strong>${preview.predictedDebt ?? 0}</strong></div>` : '';
   const selectedDelivery = actionId !== 'B09' || Boolean(options.intent);
-  return shell(`${hud(view)}<section class="panel preview" tabindex="-1"><div class="eyebrow">確認工作 · 尚未扣資源</div><h1>${esc(action.title)}</h1><p>${esc(action.tutorial)}</p><div class="receipt"><div><span>Token</span><strong>-${preview.token}</strong></div><div><span>時間</span><strong>-${preview.time}</strong></div><div><span>壓力</span><strong>+${preview.stress}</strong></div>${extra}</div>${controls(state, actionId, options, view)}<details><summary>展開教學：這不是在呼叫真工具</summary><p>畫面中的 agent、contract、merge 與 test 是遊戲狀態機概念。按下確認不會啟動真 sub-agent、CLI 或模型。</p></details><div class="actions sticky"><button class="secondary" data-case02-cancel>取消，回工作板</button><button class="primary" data-case02-confirm ${selectedDelivery ? '' : 'disabled'}>確認執行</button></div></section>`);
+  return shell(`${hud(view, '執行前案件資源')}<section class="panel preview" tabindex="-1"><div class="eyebrow">確認工作 · 尚未扣資源</div><h1>${esc(action.title)}</h1><p>${esc(action.tutorial)}</p><div class="receipt" aria-label="本次執行成本"><div><span>Token 成本</span><strong data-preview-cost="token">${formatPreviewCost(preview.token)}</strong></div><div><span>時間成本</span><strong data-preview-cost="time">${formatPreviewCost(preview.time)}</strong></div><div><span>壓力變化</span><strong data-preview-cost="stress">${formatPreviewDelta(preview.stress)}</strong></div>${extra}</div>${controls(state, actionId, options, view)}<details><summary>展開教學：這不是在呼叫真工具</summary><p>畫面中的 agent、contract、merge 與 test 是遊戲狀態機概念。按下確認不會啟動真 sub-agent、CLI 或模型。</p></details><div class="actions sticky"><button class="secondary" data-case02-cancel>取消，回工作板</button><button class="primary" data-case02-confirm ${selectedDelivery ? '' : 'disabled'}>確認執行</button></div></section>`);
 }
 
 export function renderCase02Result(state, result) {
@@ -106,7 +117,7 @@ export function renderCase02Result(state, result) {
   const beats = result.process ? [result.process.player, result.process.response, result.process.followUp, result.process.consequence] : [];
   const outcomeLabels = { success: '成功', partial: '部分成功', failure: '未成功' };
   const attempt = result.attempt ? `<p class="notice">本次公開機率 ${result.attempt.chance}% · 結果 ${outcomeLabels[result.attempt.outcome] ?? '已處理'}${result.attempt.retry ? ` · 重試理解 +${result.attempt.retryLearningGain}` : ''}${result.attempt.sequel > 1 ? ` · 事件續篇 ${result.attempt.sequel}` : ''}</p>` : '';
-  return shell(`${hud(view)}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">工作結果 · 公開證據</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${attempt}${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case02-continue>${view.pendingReward ? '先處理本局成長獎勵' : '回工作板'}</button></div></section>`);
+  return shell(`${hud(view, '執行後案件資源')}<section class="panel result" tabindex="-1" aria-live="polite"><div class="eyebrow">工作結果 · 公開證據</div><h1>${esc(result.title)}</h1><p class="lede">${esc(result.summary)}</p>${attempt}${beats.length ? `<div class="process">${beats.map((text, index) => `<article class="beat"><b>${index + 1}</b><p>${esc(text)}</p></article>`).join('')}</div>` : ''}<div class="actions"><button class="primary" data-case02-continue>${view.pendingReward ? '先處理本局成長獎勵' : '回工作板'}</button></div></section>`);
 }
 
 export function renderCase02Reward(state) {

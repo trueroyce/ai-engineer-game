@@ -1,6 +1,7 @@
-import { ACTIONS, CARDS, LIMITS, TEMPLATES } from '../narrative/rules.js';
+import { ACTIONS, CARDS, TEMPLATES } from '../narrative/rules.js';
 import { projectNarrativeView } from '../narrative/view.js';
-import { RUN_LIMITS, RUN_SCHEMA_VERSION, validateRunRecord } from './run-schema.js';
+import { isCanonicalRunId, RUN_LIMITS, RUN_SCHEMA_VERSION, validateRunRecord } from './run-schema.js';
+import { resolveInitialResourceProvenance } from './resource-provenance.js';
 
 const OUTCOME_TIERS = Object.freeze({ E01: '正式交付', E02: '正式交付', E03: '正式交付', E04: '有限試用', E05: '展示原型', E06: '正式交付', E07: '進度交接', E08: '主動停止' });
 const INTENT_LABELS = Object.freeze({ formal: '正式交付', limited: '有限試用', showcase: '展示原型', progress: '交接目前進度', stop: '主動停止' });
@@ -114,6 +115,7 @@ export function buildRunRecord(state) {
   if (!state || state.phase !== 'ended' || !state.ending) throw new Error('只有已結束的案件可以匯出');
   const view = projectNarrativeView(state);
   const template = TEMPLATES[state.templateId];
+  const initialResourceProvenance = resolveInitialResourceProvenance(state);
   const base = {
     schemaVersion: RUN_SCHEMA_VERSION,
     gameRuleVersion: state.ruleVersion,
@@ -125,7 +127,7 @@ export function buildRunRecord(state) {
     },
     character: { templateId: state.templateId, name: clipped(template.name, RUN_LIMITS.maxShortText), difficulty: clipped(template.difficulty, RUN_LIMITS.maxShortText) },
     cards: state.equipped.map((cardId) => ({ id: cardId, name: clipped(CARDS[cardId].name, RUN_LIMITS.maxShortText), level: state.cards[cardId] })),
-    initialResources: { token: LIMITS.token, stress: 0, time: LIMITS.deadline, overtime: 0, workCount: 0 },
+    initialResources: initialResourceProvenance.resources,
     finalResources: resources(state),
     ending: {
       baseId: state.ending.baseId,
@@ -220,14 +222,14 @@ async function localCoachPost(endpoint, body, capability, environment) {
 }
 
 export async function analyzeRun(runId, capability, { reanalyze = false } = {}, environment = globalThis) {
-  if (typeof runId !== 'string' || !/^case0[123]-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  if (!isCanonicalRunId(runId)) throw new Error('runId 格式無效');
   const result = await localCoachPost(capability.analysisEndpoint, { runId, reanalyze }, capability, environment);
   if (result.runId !== runId || !result.critique || typeof result.critique !== 'object') throw new Error('Claude 講評回應不完整');
   return result;
 }
 
 export async function cancelRunAnalysis(runId, capability, environment = globalThis) {
-  if (typeof runId !== 'string' || !/^case0[123]-[a-f0-9]{16}$/.test(runId)) throw new Error('runId 格式無效');
+  if (!isCanonicalRunId(runId)) throw new Error('runId 格式無效');
   return localCoachPost(capability.cancelEndpoint, { runId }, capability, environment);
 }
 

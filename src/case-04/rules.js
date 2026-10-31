@@ -1,6 +1,16 @@
 export const CASE04_RULE_VERSION = 'case-04-legacy@1';
 export const CASE04_LIMITS = Object.freeze({ token: 18, tokenCap: 24, stressCap: 10, deadline: 12 });
 
+export function case04StartingResources(templateId) {
+  return Object.freeze({
+    token: CASE04_LIMITS.token + (templateId === 'beginner' ? 4 : templateId === 'ultimate' ? 3 : 0),
+    stress: 0,
+    time: CASE04_LIMITS.deadline + (templateId === 'beginner' ? 2 : templateId === 'ultimate' ? 1 : 0),
+    overtime: 0,
+    workCount: 0,
+  });
+}
+
 export const CASE04_ACTIONS = Object.freeze({
   D01: { id: 'D01', title: '把「昨天還好好的」變成可重現事故', tutorial: '先讀 log、重現與比對昨天版本；猜到不算找到。' },
   D02: { id: 'D02', title: '選一條救火策略', tutorial: '補丁、根因調查、局部重構與回滾各有公開代價。' },

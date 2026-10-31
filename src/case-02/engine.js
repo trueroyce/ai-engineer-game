@@ -7,6 +7,7 @@ import {
   CASE02_REWARD_CHOICES,
   CASE02_REWARD_ID,
   CASE02_RULE_VERSION,
+  case02StartingResources,
   CONTRACT_OPTIONS,
   NORMALIZATION_STRATEGIES,
 } from './rules.js';
@@ -52,6 +53,7 @@ function applyWorkCost(state, preview) {
   state.timeLeft -= preview.time;
   state.stress = Math.min(CASE02_LIMITS.stressCap, state.stress + preview.stress);
   state.workCount += 1;
+  state._resourceCost = { token: preview.token, time: preview.time, stress: preview.stress };
 }
 
 function publicBlockers(state) {
@@ -93,6 +95,7 @@ export function createCase02Game({ templateId, cards = {}, equipped = [], reward
     safeCards[id] = level;
   }
   const safeEquipped = [...new Set(equipped)].filter((id) => safeCards[id]).slice(0, 3);
+  const initialResources = case02StartingResources(templateId);
   const state = {
     ruleVersion: CASE02_RULE_VERSION,
     caseId: 'case-02',
@@ -100,9 +103,10 @@ export function createCase02Game({ templateId, cards = {}, equipped = [], reward
     stateVersion: 0,
     templateId,
     abilities: clone(template.attrs),
-    token: CASE02_LIMITS.token,
-    stress: 0,
-    timeLeft: CASE02_LIMITS.deadline,
+    initialResources: clone(initialResources),
+    token: initialResources.token,
+    stress: initialResources.stress,
+    timeLeft: initialResources.time,
     workCount: 0,
     cards: safeCards,
     equipped: safeEquipped,
@@ -188,6 +192,7 @@ export function performCase02Action(original, actionId, raw = {}) {
   if (original.operationResults[operationId]) return { state: clone(original), result: clone(original.operationResults[operationId]), cached: true };
   if (stateVersion !== original.stateVersion) throw new Error('畫面已更新，請重新確認這一步');
   const state = clone(original);
+  const resourcesBefore = { token: state.token, stress: state.stress, time: state.timeLeft };
   ensureActionAvailable(state, actionId);
   let out;
 
@@ -347,8 +352,15 @@ export function performCase02Action(original, actionId, raw = {}) {
     out = { type: 'ending', ending: clone(ending), blockers };
   }
 
+  const resourceCost = state._resourceCost ?? { token: 0, time: 0, stress: 0 };
+  delete state._resourceCost;
+  const resourceAdjustment = {
+    token: state.token - (resourcesBefore.token - resourceCost.token),
+    time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+    stress: state.stress - Math.min(CASE02_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+  };
   state.stateVersion += 1;
-  state.log.push({ actionId, options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))), resources: { token: state.token, stress: state.stress, time: state.timeLeft }, dataRevision: state.dataRevision });
+  state.log.push({ actionId, options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))), resourceCost, resourceAdjustment, resources: { token: state.token, stress: state.stress, time: state.timeLeft }, dataRevision: state.dataRevision });
   state.operationResults[operationId] = clone(out);
   return { state, result: out, cached: false };
 }

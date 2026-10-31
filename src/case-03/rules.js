@@ -2,6 +2,16 @@ export const CASE03_RULE_VERSION = 'case-03-booking@2';
 
 export const CASE03_LIMITS = Object.freeze({ token: 18, tokenCap: 24, stressCap: 10, deadline: 12 });
 
+export function case03StartingResources(templateId) {
+  return Object.freeze({
+    token: CASE03_LIMITS.token + (templateId === 'beginner' ? 4 : templateId === 'ultimate' ? 5 : 0),
+    stress: 0,
+    time: CASE03_LIMITS.deadline + (templateId === 'beginner' ? 2 : templateId === 'ultimate' ? 3 : 0),
+    overtime: 0,
+    workCount: 0,
+  });
+}
+
 export const CASE03_ACTIONS = Object.freeze({
   C01: { id: 'C01', title: '把「只改一點點」拆成決策', tutorial: '客戶、設計師與工程師各自說得有道理；先把衝突寫成客戶能回答的問題。' },
   C02: { id: 'C02', title: '簽下預約介面契約', tutorial: '時區、取消與重複借用必須由玩家請客戶決定；agent 不能代替客戶點頭。' },

@@ -1,0 +1,27 @@
+{
+  "name": "ai-engineer-game",
+  "version": "5.0.0",
+  "private": true,
+  "description": "AI 工程接案遊戲：四案繁體中文敘事工程模擬；零依賴、可離線啟動。",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test",
+    "test:narrative": "node --test tests/narrative/*.test.js",
+    "test:browser": "node tests/browser/slice.browser.mjs",
+    "test:browser:full": "node tests/browser/full.browser.mjs --browser chrome",
+    "test:browser:narrative": "node tests/browser/deepening.browser.mjs --browser chrome",
+    "test:browser:career": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:case-02": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:case-02-narrative": "node tests/browser/case-02-narrative.browser.mjs --browser chrome",
+    "test:browser:case-03": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:case-04": "node tests/browser/case-04.browser.mjs --browser chrome",
+    "test:browser:redesign": "node tests/browser/redesign.browser.mjs --browser chrome",
+    "test:browser:natural": "node tests/browser/natural-play.browser.mjs --browser chrome",
+    "test:mcp": "node --test tests/mcp/*.test.js tests/narrative/run-export.test.js",
+    "test:local-coach": "node --test tests/local-coach/*.test.js",
+    "test:browser:mcp": "node tests/browser/mcp-export.browser.mjs --browser chrome",
+    "test:browser:local-coach": "node tests/browser/local-coach.browser.mjs --browser chrome",
+    "test:browser:phase29": "node tests/browser/phase29-visual-coach.browser.mjs --browser chrome"
+  }
+}

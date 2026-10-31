@@ -1,0 +1,40 @@
+// 黃金重播：careful_revised（T2 表；text-playtest.md §3 載明在 T3 下數值與選卡完全相同，
+// 因該局未啟用 C2 且未修復）。資料逐字抄自 design.md D12，不由引擎產生。C2 全程關閉。
+export default {
+  name: 'careful_revised',
+  source: 'docs/canonical/text-playtest.md 歷史附錄 T2 §4 careful_revised（T3 下相同）',
+  attributes: { A: 2, E: 2, V: 2 },
+  successDice: [76, 23, 93, 10, 40, 84, 3, 25, 68, 99, 8, 96, 84, 72, 12],
+  defectDice: [55, 49, 100, 29, 26, 87, 93, 74, 57],
+  opening: { candidates: ['C1', 'C2', 'C5', 'C4'], pick: ['C5', 'C2'] },
+  levelDrafts: [
+    { turn: 5, candidates: [['C4', 'new'], ['C5', 'upgrade'], ['C1', 'new']], choice: { type: 'take', cardId: 'C5' } },
+    { turn: 10, candidates: [['C1', 'new'], ['C4', 'new'], ['C3', 'new']], choice: { type: 'take', cardId: 'C4' } },
+    { turn: 14, candidates: [['C3', 'new'], ['C6', 'new'], ['C2', 'upgrade']], choice: { type: 'take', cardId: 'C3', replace: 'C2' } },
+  ],
+  turns: [
+    { turn: 1, age: 1, project: 'J1', accept: 'J1', action: 'analyze', toggles: {}, cost: 2, s: [1, 76, 70, false], P: 0, H: 0, K: 0, B: 10, N: 1, T: 16, S: 0, xp: 0, lv: 1, score: 0, tools: [['C5', 1], ['C2', 1]], tags: [] },
+    { turn: 2, age: 2, project: 'J1', action: 'implement', toggles: {}, cost: 3, s: [2, 23, 80, true], h: [1, 55, 5, false], P: 2, H: 0, K: 0, B: 0, N: 0, T: 13, S: 1, xp: 1, lv: 1, score: 0, tools: [['C5', 1], ['C2', 1]], tags: ['half'] },
+    { turn: 3, age: 3, project: 'J1', action: 'implement', toggles: {}, cost: 3, s: [3, 93, 70, false], h: [2, 49, 15, false], P: 3, H: 0, K: 0, B: 0, N: 0, T: 10, S: 2, xp: 1, lv: 1, score: 0, tools: [['C5', 1], ['C2', 1]], tags: [] },
+    { turn: 4, age: 4, project: 'J1', action: 'implement', toggles: {}, cost: 3, s: [4, 10, 70, true], h: [3, 100, 15, false], P: 4, H: 0, K: 0, B: 0, N: 0, T: 7, S: 3, xp: 2, lv: 1, score: 0, tools: [['C5', 1], ['C2', 1]], tags: ['full'] },
+    { turn: 5, age: 5, project: 'J1', action: 'verify', toggles: {}, cost: 2, s: [5, 40, 65, true], P: 4, H: 0, K: 0, B: 0, N: 0, T: 5, S: 3, xp: 3, lv: 2, score: 0, tools: [['C5', 2], ['C2', 1]], tags: ['quality', 'revealed:0'] },
+    { turn: 6, age: 6, project: 'J1', action: 'deliver', toggles: {}, cost: 0, P: 4, H: 0, K: 0, B: 0, N: 0, T: 11, S: 3, xp: 5, lv: 2, score: 2, tools: [['C5', 2], ['C2', 1]], tags: ['delivery', 'delivered'] },
+    { turn: 7, age: 1, project: 'J2', accept: 'J2', action: 'analyze', toggles: {}, cost: 2, s: [6, 84, 55, false], P: 0, H: 0, K: 0, B: 10, N: 1, T: 9, S: 3, xp: 5, lv: 2, score: 2, tools: [['C5', 2], ['C2', 1]], tags: [] },
+    { turn: 8, age: 2, project: 'J2', action: 'implement', toggles: {}, cost: 3, s: [7, 3, 65, true], h: [4, 29, 5, false], P: 2, H: 0, K: 0, B: 0, N: 0, T: 6, S: 4, xp: 5, lv: 2, score: 2, tools: [['C5', 2], ['C2', 1]], tags: [] },
+    { turn: 9, age: 3, project: 'J2', action: 'analyze', toggles: {}, cost: 2, s: [8, 25, 55, true], P: 2, H: 0, K: 0, B: 20, N: 2, T: 4, S: 4, xp: 5, lv: 2, score: 2, tools: [['C5', 2], ['C2', 1]], tags: [] },
+    { turn: 10, age: 4, project: 'J2', action: 'implement', toggles: {}, cost: 3, s: [9, 68, 75, true], h: [5, 26, 5, false], P: 4, H: 0, K: 0, B: 20, N: 1, T: 1, S: 5, xp: 6, lv: 3, score: 2, tools: [['C5', 2], ['C2', 1], ['C4', 1]], tags: ['half'] },
+    { turn: 11, age: 5, project: 'J2', action: 'rest', toggles: {}, cost: 0, P: 4, H: 0, K: 0, B: 20, N: 1, T: 7, S: 2, xp: 6, lv: 3, score: 2, tools: [['C5', 2], ['C2', 1], ['C4', 1]], tags: [] },
+    { turn: 12, age: 6, project: 'J2', action: 'implement', toggles: {}, cost: 3, s: [10, 99, 80, false], h: [6, 87, 5, false], P: 5, H: 0, K: 0, B: 0, N: 0, T: 4, S: 3, xp: 6, lv: 3, score: 2, tools: [['C5', 2], ['C2', 1], ['C4', 1]], tags: [] },
+    { turn: 13, age: 7, project: 'J2', action: 'implement', toggles: {}, cost: 3, s: [11, 8, 55, true], h: [7, 93, 15, false], P: 6, H: 0, K: 0, B: 0, N: 0, T: 1, S: 4, xp: 7, lv: 3, score: 2, tools: [['C5', 2], ['C2', 1], ['C4', 1]], tags: ['full'] },
+    { turn: 14, age: 8, project: 'J2', action: 'deliver', toggles: {}, cost: 0, P: 6, H: 0, K: 0, B: 0, N: 0, T: 10, S: 4, xp: 10, lv: 4, score: 6, tools: [['C5', 2], ['C4', 1], ['C3', 1]], tags: ['quality', 'delivery', 'delivered'] },
+    { turn: 15, age: 1, project: 'J3', accept: 'J3', action: 'analyze', toggles: {}, cost: 2, s: [12, 96, 45, false], P: 0, H: 0, K: 0, B: 10, N: 1, T: 8, S: 4, xp: 10, lv: 4, score: 6, tools: [['C5', 2], ['C4', 1], ['C3', 1]], tags: [] },
+    { turn: 16, age: 2, project: 'J3', action: 'implement', toggles: {}, cost: 3, s: [13, 84, 55, false], h: [8, 74, 5, false], P: 1, H: 0, K: 0, B: 0, N: 0, T: 5, S: 5, xp: 10, lv: 4, score: 6, tools: [['C5', 2], ['C4', 1], ['C3', 1]], tags: [] },
+    { turn: 17, age: 3, project: 'J3', action: 'analyze', toggles: {}, cost: 2, s: [14, 72, 45, false], P: 1, H: 0, K: 0, B: 10, N: 1, T: 3, S: 5, xp: 10, lv: 4, score: 6, tools: [['C5', 2], ['C4', 1], ['C3', 1]], tags: [] },
+    { turn: 18, age: 4, project: 'J3', action: 'implement', toggles: {}, cost: 3, s: [15, 12, 55, true], h: [9, 57, 5, false], P: 3, H: 0, K: 0, B: 0, N: 0, T: 0, S: 6, xp: 10, lv: 4, score: 6, tools: [['C5', 2], ['C4', 1], ['C3', 1]], tags: ['deadline'] },
+  ],
+  final: {
+    score: 6, xp: 10, level: 4, token: 0, stress: 6, ending: '穩定交付', endReason: 'deadline',
+    equipped: [['C5', 2], ['C4', 1], ['C3', 1]],
+    statuses: { J1: 'delivered', J2: 'delivered', J3: 'active' },
+  },
+};

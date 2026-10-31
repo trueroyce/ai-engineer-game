@@ -2,6 +2,7 @@ import { TEMPLATES } from '../narrative/rules.js';
 import { CARDS } from './cards.js';
 import { starterChoicesForCareer } from './progression.js';
 import { CAREER_LEVELS, completeStarterSelection, createCareer, loadCareer, resetCareer, saveCareer, toggleEquipped } from './state-v2.js';
+import { cardIllustration, caseFileIllustration, characterPortrait } from '../narrative-ui/art.js';
 
 const root = document.querySelector('#app');
 let loaded = loadCareer();
@@ -76,7 +77,8 @@ function renderLobby(career) {
     const active = loadout.includes(id);
     const applicableCases = CARDS[id].cases.map((caseId) => caseId.slice(-2)).join('、');
     const applicable = CARDS[id].cases.includes(selectedLoadoutCase);
-    return `<button class="owned-card ${active ? 'active' : ''}" data-toggle-card="${id}" aria-pressed="${active}" ${applicable ? '' : 'disabled'}><span><strong>${esc(CARDS[id].name)}</strong> · Lv.${cardLevel}</span><small>適用案件 ${esc(applicableCases)} · ${!applicable ? '本案不適用（仍保留收藏）' : active ? '本案啟用中（點一下停用）' : loadout.length >= 3 ? '本案三槽已滿' : '收藏中（點一下啟用）'}</small></button>`;
+    const status = !applicable ? '本案不適用（仍保留收藏）' : active ? '' : loadout.length >= 3 ? '本案三槽已滿' : '可裝備';
+    return `<button class="owned-card ${active ? 'active' : ''}" data-toggle-card="${id}" aria-pressed="${active}" ${applicable ? '' : 'disabled'}><span><strong>${esc(CARDS[id].name)}</strong> · Lv.${cardLevel}</span><small>適用案件 ${esc(applicableCases)}${status ? ` · ${status}` : ''}</small></button>`;
   }).join('') || '<p class="empty">卡庫還是空的；請先完成職涯起手三選一。</p>';
   const played = career.completedCases['case-01']?.plays ?? 0;
   const activeNotice = career.activeRun ? `<p class="notice good"><strong>進行中：</strong>${esc(career.activeRun.caseId)} · ${esc(career.activeRun.runId)}。刷新、返回大廳或關頁後會繼續同一局；只有合法結案／止損才建立下一個 run。</p>` : '';
@@ -98,13 +100,23 @@ function enableCase02(career) {
   if (chooserCopy) chooserCopy.textContent = '「進階」只是提示，不是門鎖；案件 01 與 02 都可直接開局。';
 }
 
+function decorateCareerArt() {
+  root.querySelectorAll('[data-template]').forEach((choice) => choice.insertAdjacentHTML('afterbegin', characterPortrait(choice.dataset.template)));
+  root.querySelectorAll('[data-starter-card]').forEach((choice) => choice.insertAdjacentHTML('afterbegin', cardIllustration(choice.dataset.starterCard, 1)));
+  root.querySelectorAll('[data-toggle-card]').forEach((choice) => {
+    const id = choice.dataset.toggleCard;
+    choice.insertAdjacentHTML('afterbegin', cardIllustration(id, loaded.career?.cards?.[id] ?? 1));
+  });
+  root.querySelectorAll('.project').forEach((project, index) => project.insertAdjacentHTML('beforeend', caseFileIllustration(`case-0${index + 1}`)));
+}
+
 function render() {
   if (loaded.status === 'ready') {
-    if (loaded.career.starterSelection.status === 'pending') { renderStarter(loaded.career); return; }
-    renderLobby(loaded.career);
-  }
-  else if (loaded.status === 'empty') renderOnboarding();
+    if (loaded.career.starterSelection.status === 'pending') renderStarter(loaded.career);
+    else renderLobby(loaded.career);
+  } else if (loaded.status === 'empty') renderOnboarding();
   else renderRecovery();
+  decorateCareerArt();
 }
 
 root.addEventListener('click', (event) => {

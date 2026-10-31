@@ -12,7 +12,7 @@ import {
   performCase03StoryAction,
   previewCase03StoryAction,
 } from './story.js';
-import { CASE03_LIMITS, CASE03_REWARD_ID, CASE03_REWARD_POOL, CASE03_RULE_VERSION, STRATEGIES } from './rules.js';
+import { CASE03_LIMITS, CASE03_REWARD_ID, CASE03_REWARD_POOL, CASE03_RULE_VERSION, STRATEGIES, case03StartingResources } from './rules.js';
 
 const clone = (value) => structuredClone(value);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -98,9 +98,13 @@ export function createCase03Game(options = {}) {
   const cards = clone(options.cards ?? {});
   const equipped = (options.equipped ?? []).filter((id) => cards[id]).slice(0, 3);
   const seed = Number.isInteger(options.seed) ? options.seed >>> 0 : randomSeed();
+  const initialResources = case03StartingResources(options.templateId);
   const state = {
     caseId: 'case-03', ruleVersion: CASE03_RULE_VERSION, phase: 'playing', templateId: options.templateId,
-    abilities: clone(TEMPLATES[options.templateId].attrs), token: 18, stress: 0, timeLeft: 12,
+    abilities: clone(TEMPLATES[options.templateId].attrs), initialResources: clone(initialResources),
+    token: initialResources.token,
+    stress: initialResources.stress,
+    timeLeft: initialResources.time,
     cards, equipped, requirements: null, contract: null, implementation: null, merge: null,
     change: { announced: false, handled: false }, evidence: { revision: null, coverage: 0, trace: false, failed: [] },
     artifactRevision: 0, integrationDebt: 0, ledger: [], rewardClaims: [], pendingReward: null, rewardFallback: null,
@@ -184,11 +188,18 @@ export function performCase03Action(original, actionId, raw = {}) {
     state.story = normalizeCase03Story(state.story);
     if (actionId === 'C09' && !state.story.openRecovery) throw new Error('目前沒有待處理的失敗岔路');
     if (actionId === 'C10' && !state.story.openOpportunity) throw new Error('目前沒有待處理的成功誘惑');
+    const resourcesBefore = { token: state.token, stress: state.stress, time: state.timeLeft };
     const output = performCase03StoryAction(state, actionId, raw);
+    const resourceCost = { token: output.cost.token, time: output.cost.time, stress: output.cost.stress };
+    const resourceAdjustment = {
+      token: state.token - (resourcesBefore.token - resourceCost.token),
+      time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+      stress: state.stress - Math.min(CASE03_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+    };
     state.stateVersion += 1;
     state.operationPayloads[raw.operationId] = requestPayload;
     state.operationResults[raw.operationId] = clone(output.result);
-    state.log.push({ actionId, options: { route: raw.route }, outcome: output.result.outcome, artifactRevision: state.artifactRevision, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
+    state.log.push({ actionId, options: { route: raw.route }, outcome: output.result.outcome, artifactRevision: state.artifactRevision, resourceCost, resourceAdjustment, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
     return { state, result: output.result, cached: false };
   }
   if (actionId === 'C02' && !original.requirements) throw new Error('先處理需求矛盾');
@@ -202,6 +213,7 @@ export function performCase03Action(original, actionId, raw = {}) {
   if (actionId === 'C07' && raw.intent === 'limited' && !original.implementation?.complete) throw new Error('尚無可交付子集，不能有限試用');
   const state = clone(original);
   state.lastAttempt = null;
+  const resourcesBefore = { token: state.token, stress: state.stress, time: state.timeLeft };
   const cost = previewCase03Action(state, actionId, raw);
   const spendRefund = spend(state, cost);
   let result;
@@ -334,11 +346,19 @@ export function performCase03Action(original, actionId, raw = {}) {
   state.stateVersion += 1;
   state.operationPayloads[raw.operationId] = requestPayload;
   state.operationResults[raw.operationId] = clone(result);
+  const resourceCost = { token: cost.token, time: cost.time, stress: cost.stress };
+  const resourceAdjustment = {
+    token: state.token - (resourcesBefore.token - resourceCost.token),
+    time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+    stress: state.stress - Math.min(CASE03_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+  };
   state.log.push({
     actionId,
     options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))),
     outcome: result.outcome,
     artifactRevision: state.artifactRevision,
+    resourceCost,
+    resourceAdjustment,
     resources: { token: state.token, stress: state.stress, time: state.timeLeft },
   });
   return { state, result, cached: false };

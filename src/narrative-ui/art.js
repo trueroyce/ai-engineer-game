@@ -18,21 +18,45 @@ const portraitProps = Object.freeze({
   beginner: '<path class="ink paper-fill" d="M185 136c23-26 47 20 20 34-24 12-33-22-11-25 18-3 21 21 5 26"/><path class="ink accent-fill" d="M63 135h52v38H63zM72 146h33M72 157h24"/><path class="ink" d="M78 61q22-22 44 0"/>',
 });
 
-export function characterPortrait(templateId) {
+export function characterPortrait(templateId, expression = 'focused') {
   const id = safeId(templateId);
-  const [primary, secondary] = palette[id] ?? palette.balanced;
-  return svg(`portrait portrait-${id}`, `
-    <rect class="paper-fill ink" x="13" y="13" width="294" height="174" rx="24"/>
-    <path class="desk-fill ink" d="M23 151h274v36H23z"/>
-    <circle class="accent-soft" cx="112" cy="86" r="62" style="--art-soft:${secondary}"/>
-    <path class="ink hair-fill" d="M78 88q0-51 39-51 43 0 44 51l-15-6-8-24-22 14-25-6z"/>
-    <path class="ink skin-fill" d="M84 78q0 60 33 60t35-60q-21-3-35-21-12 17-33 21z"/>
-    <circle class="solid-ink" cx="104" cy="91" r="4"/><circle class="solid-ink" cx="134" cy="91" r="4"/>
-    <path class="ink" d="M107 112q12 10 24 0"/>
-    <path class="ink accent-fill" d="M68 169q4-42 49-42 47 0 52 42z" style="--art-accent:${primary}"/>
-    <path class="ink paper-fill" d="M143 132h51l12 37h-59z"/><path class="ink" d="M153 143h34M157 153h29"/>
-    ${portraitProps[id] ?? portraitProps.balanced}
-  `);
+  const known = Object.hasOwn(palette, id) ? id : 'balanced';
+  const mood = ['focused', 'worried', 'skeptical', 'relieved'].includes(expression) ? expression : 'focused';
+  return `<span class="game-art template-art raster-template portrait-${known} expression-${mood}" style="--portrait-image:url('./assets/art/characters/player-${known}-${mood}.png')" aria-hidden="true"></span>`;
+}
+
+const caseFileScenes = Object.freeze({
+  'case-01': `
+    <path class="paper-fill ink" d="M18 24h284v142H18z"/>
+    <path class="accent-soft ink" d="M34 39h143v82H34z"/><path class="thin" d="M49 57h91M49 75h68M49 93h99"/>
+    <circle class="paper-fill ink" cx="248" cy="68" r="31"/><path class="ink" d="M248 50v20l14 8"/>
+    <path class="accent-fill ink" d="M196 117h86v35h-86z"/><path class="thin" d="M210 132h57"/>`,
+  'case-02': `
+    <path class="paper-fill ink" d="M28 38h69v111H28zM126 25h69v124h-69zM224 45h69v104h-69z"/>
+    <path class="thin" d="M40 58h44M40 76h34M138 48h44M138 66h34M236 64h44M236 82h34"/>
+    <path class="accent-fill ink" d="M62 160h196M62 148v24M160 137v35M258 148v24"/>
+    <path class="ink" d="M98 96h28M195 96h29"/>`,
+  'case-03': `
+    <path class="screen-fill ink" d="M21 31h278v126H21z"/>
+    <path class="accent-fill ink" d="M43 50h48v31H43zM101 43h54v35h-54zM166 55h52v32h-52zM229 42h48v37h-48zM59 94h55v35H59zM129 91h59v39h-59zM201 98h61v34h-61z"/>
+    <path class="ink" d="M67 81v13M128 78v13M192 87v11M86 129v15M158 130v15M231 132v14"/>`,
+  'case-04': `
+    <path class="screen-fill ink" d="M18 24h284v139H18z"/>
+    <path class="paper-fill ink" d="M36 43h142v83H36z"/><path class="accent-line" d="M51 63h103M51 82h74M51 101h91"/>
+    <path class="accent-fill ink" d="M219 41h47l18 48h-83z"/><path class="ink" d="M243 89v51M216 145h54"/>
+    <path class="star-fill ink" d="M193 118h45v30h-45z"/><path class="thin" d="M198 127h35M198 137h24"/>`,
+});
+
+export function caseFileIllustration(caseId) {
+  const id = safeId(caseId);
+  const known = Object.hasOwn(caseFileScenes, caseId) ? id : 'case-01';
+  const file = {
+    'case-01': 'case01-meeting-room.png',
+    'case-02': 'case02-data-room.png',
+    'case-03': 'case03-client-room.png',
+    'case-04': 'case04-server-warroom.png',
+  }[known];
+  return `<span class="game-art case-file-art raster-case-file file-${known}" style="--scene-image:url('./assets/art/backgrounds/${file}')" aria-hidden="true"></span>`;
 }
 
 const cardGlyphs = Object.freeze({
@@ -58,14 +82,9 @@ const cardGlyphs = Object.freeze({
 
 export function cardIllustration(cardId, level = 1) {
   const id = safeId(cardId);
-  const stars = level > 1
-    ? '<path class="star-fill ink" d="M251 41l7 14 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2z"/>'
-    : '<circle class="accent-soft ink" cx="251" cy="61" r="15"/>';
-  return svg(`card-illustration card-${id.toLowerCase()} level-${level}`, `
-    <rect class="card-art-bg ink" x="12" y="12" width="296" height="176" rx="21"/>
-    <path class="halftone" d="M222 30h67v138h-67z"/>
-    ${cardGlyphs[id] ?? cardGlyphs.C1}${stars}
-  `);
+  const number = Number(id.replace('C', '')) || 1;
+  const category = number <= 3 || number === 13 ? 'understand' : [4, 7, 8, 9, 10, 15].includes(number) ? 'build' : [5, 11, 12, 17].includes(number) ? 'coordinate' : 'risk';
+  return `<span class="game-art card-illustration raster-card card-${id.toLowerCase()} level-${level} category-${category}" style="--card-image:url('./assets/art/cards/${id}.png')" aria-hidden="true"><i class="category-shape"></i>${level > 1 ? '<b class="fusion-star">★</b>' : ''}</span>`;
 }
 
 const actionGlyphs = Object.freeze({
@@ -97,16 +116,8 @@ export function hudIcon(kind) {
 }
 
 export function caseScene(view) {
-  const completed = view.progress.checks.filter((check) => /通過|完成|有效/.test(check.status)).length;
-  const lamps = Array.from({ length: 6 }, (_, index) => `<circle class="ink ${index < completed ? 'lamp-on' : 'lamp-off'}" cx="${75 + index * 24}" cy="145" r="7"/>`).join('');
-  return svg('case-scene', `
-    <path class="shadow-fill" d="M28 164h264v20H28z"/>
-    <path class="paper-fill ink" d="M42 33h104v110H42z"/><path class="thin" d="M58 55h69M58 73h53M58 91h69M58 109h42"/>
-    <path class="tape-fill" d="M76 24h38v18H76z"/>
-    <path class="screen-fill ink" d="M156 48h127v82H156z"/><path class="ink" d="M142 145h155l-14-15H156z"/>
-    <path class="accent-line" d="M177 72h77M177 91h45M177 110h62"/>
-    ${lamps}<path class="ink accent-fill" d="M247 22l20 7-5 20-20-7z"/><path class="thin" d="M250 31l10 4"/>
-  `);
+  const templateId = safeId(view?.templateId ?? 'balanced');
+  return `<span class="game-art case-scene raster-case-scene" aria-hidden="true">${characterPortrait(templateId)}</span>`;
 }
 
 const EVENT_TONES = Object.freeze({
@@ -132,7 +143,7 @@ export function processIcon(kind, tone = 'mixed') {
   return svg(`process-icon tone-${safeId(tone)}`, `<g class="ink paper-fill">${glyphs[kind] ?? glyphs.player}</g>`, '0 0 140 120');
 }
 
-export function endingIllustration(baseId, facets = []) {
+export function endingIllustration(baseId, facets = [], templateId = 'balanced') {
   const id = safeId(baseId);
   const tier = ['E01', 'E02', 'E03', 'E06'].includes(id) ? 'formal' : id === 'E04' ? 'limited' : id === 'E05' ? 'showcase' : id === 'E07' ? 'handoff' : 'stop';
   const centers = {
@@ -148,6 +159,8 @@ export function endingIllustration(baseId, facets = []) {
     facets.includes('high-stress') ? '<path class="danger-line" d="M48 112q-24-18 0-36t0-36"/>' : '',
     facets.includes('recovered') ? '<path class="paper-fill ink" d="M33 39l39-11 9 31-39 11zM43 45l28-8M53 36l8 27"/>' : '',
   ].join('');
-  return svg(`ending-illustration ending-${tier}`, `<path class="accent-soft" d="M21 28h278v145H21z"/>${centers[tier]}${extras}`);
+  const officeBackdrop = '<path class="accent-soft ink" d="M20 26h280v148H20z"/><path class="paper-fill ink" d="M35 41h92v68H35z"/><path class="thin" d="M48 57h62M48 73h46M48 89h57"/><circle class="paper-fill ink" cx="270" cy="55" r="20"/><path class="ink" d="M270 43v14l10 6"/><path class="desk-fill ink" d="M29 151h262v23H29z"/>';
+  const expression = tier === 'formal' ? 'relieved' : tier === 'stop' ? 'worried' : 'skeptical';
+  return `<span class="game-art ending-illustration raster-ending ending-${tier}" aria-hidden="true">${characterPortrait(templateId, expression)}<i class="ending-emblem">${tier === 'formal' ? '✓' : tier === 'limited' ? '△' : tier === 'showcase' ? '★' : tier === 'handoff' ? '→' : '■'}</i></span>`;
 }
 

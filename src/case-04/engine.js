@@ -4,7 +4,7 @@ import { choosePendingRunReward, grantRunProgress, initializeRunRewards } from '
 import { applySpendRefund } from '../career/card-runtime.js';
 import { CARDS } from '../career/cards.js';
 import { TEMPLATES } from '../narrative/rules.js';
-import { CASE04_ACTIONS, CASE04_ENDINGS, CASE04_LIMITS, CASE04_RULE_VERSION, STRATEGIES } from './rules.js';
+import { CASE04_ACTIONS, CASE04_ENDINGS, CASE04_LIMITS, CASE04_RULE_VERSION, STRATEGIES, case04StartingResources } from './rules.js';
 
 const clone = (value) => structuredClone(value);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -112,7 +112,7 @@ function actionAvailable(state, actionId) {
   if (actionId === 'D11') return Boolean(state.story.commitment && state.service.stable && !validApproval(state, ['verified'])
     && safeRollbackCompatibility(state));
   if (actionId === 'D05') return Boolean(state.story.commitment && (!state.rootCause || !state.rootCause.confirmed));
-  if (actionId === 'D07') return Boolean(state.rootCause && (state.evidence.revision !== state.revision || state.evidence.failed.length));
+  if (actionId === 'D07') return Boolean(state.rootCause && (state.evidence.revision !== state.revision || state.evidence.coverage < 4 || state.evidence.failed.length));
   if (actionId === 'D06') return Boolean(state.story.pendingConsequence?.revealed && !state.story.pendingConsequence.resolved);
   if (actionId === 'D08') return Boolean(state.story.pendingConsequence?.resolved && state.evidence.revision === state.revision && !state.handoff.complete);
   if (actionId === 'D09') return true;
@@ -138,9 +138,13 @@ export function createCase04Game(options = {}) {
   const cards = clone(options.cards ?? {});
   const equipped = (options.equipped ?? []).filter((id) => cards[id] && CARDS[id]?.cases.includes('case-04')).slice(0, 3);
   const seed = Number.isInteger(options.seed) ? options.seed >>> 0 : randomSeed();
+  const initialResources = case04StartingResources(options.templateId);
   const state = {
     caseId: 'case-04', ruleVersion: CASE04_RULE_VERSION, phase: 'playing', templateId: options.templateId,
-    abilities: clone(TEMPLATES[options.templateId].attrs), token: 18, stress: 0, timeLeft: 12,
+    abilities: clone(TEMPLATES[options.templateId].attrs), initialResources: clone(initialResources),
+    token: initialResources.token,
+    stress: initialResources.stress,
+    timeLeft: initialResources.time,
     cards, equipped, diagnosis: null, strategy: null, service: { attempted: false, stable: false, mode: null }, rootCause: null,
     revision: 1, dataCompatibility: 'unknown', compatibilityDecision: null,
     approval: { status: 'pending', scope: null, revision: null, owner: null },
@@ -301,6 +305,7 @@ function publicResult(state, actionId, options, attempt) {
     if (success) {
       if (options.response === 'repair') {
         resolveIssue(state, pending.id);
+        if (state.story.commitment === 'improve') resolveIssue(state, 'extra-change');
         advanceRevision(state, `repair-${pending.id}`);
         if (pending.id === 'schema-drift') {
           state.dataCompatibility = 'compatible';
@@ -399,7 +404,18 @@ function ending(state, intent) {
   const baseId = intent === 'verified' ? 'C04-VERIFIED' : intent === 'limited' ? 'C04-LIMITED' : intent === 'risk' ? 'C04-FAILED' : 'C04-STOP';
   const base = CASE04_ENDINGS[baseId];
   const routeTitles = { patch: '補丁疊補丁，至少每層都有標籤', investigate: '祖傳程式馴獸師', refactor: '上線前一天重構的人還活著', rollback: '回滾救世主，先問資料答不答應' };
-  return { baseId, ...base, playFacets: [{ id: `strategy-${state.strategy}`, title: routeTitles[state.strategy], text: `你走過 ${STRATEGIES[state.strategy].label}；延後後果與未解問題都保留在公開紀錄。` }] };
+  const strategy = state.strategy && STRATEGIES[state.strategy];
+  return {
+    baseId,
+    ...base,
+    playFacets: [{
+      id: `strategy-${state.strategy ?? 'unselected'}`,
+      title: routeTitles[state.strategy] ?? '先保留現場，再決定怎麼救',
+      text: strategy
+        ? `你走過 ${strategy.label}；延後後果與未解問題都保留在公開紀錄。`
+        : '你在選定救火策略前先止損；尚未完成的判斷與下一步都保留在公開紀錄。',
+    }],
+  };
 }
 
 export function performCase04Action(original, actionId, raw = {}) {
@@ -411,12 +427,21 @@ export function performCase04Action(original, actionId, raw = {}) {
   }
   if (raw.stateVersion !== original.stateVersion) throw new Error('stale_state_version');
   if (original.pendingReward) throw new Error('請先處理目前的成長獎勵');
-  const state = clone(original); const preview = previewCase04Action(state, actionId, raw); const refunded = spend(state, preview);
+  const state = clone(original);
+  const resourcesBefore = { token: state.token, stress: state.stress, time: state.timeLeft };
+  const preview = previewCase04Action(state, actionId, raw);
+  const refunded = spend(state, preview);
+  const resourceCost = { token: preview.token, time: preview.time, stress: preview.stress };
   if (actionId === 'D09') {
     state.ending = ending(state, raw.intent); state.phase = 'ended';
     if (raw.intent === 'verified') state.ledger.push('verified_delivery');
     const output = result(state.ending.title, state.ending.text, process('你選擇與證據相符的結案方式。', '值班表接受目前狀態。', '職涯保留卡片與 EXP，短期資源歸零。', '故事稱號不會蓋過交付事實。'), raw.intent);
-    state.stateVersion += 1; state.operationPayloads[raw.operationId] = payload; state.operationResults[raw.operationId] = clone(output); state.log.push({ actionId, options: { intent: raw.intent }, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
+    const resourceAdjustment = {
+      token: state.token - (resourcesBefore.token - resourceCost.token),
+      time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+      stress: state.stress - Math.min(CASE04_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+    };
+    state.stateVersion += 1; state.operationPayloads[raw.operationId] = payload; state.operationResults[raw.operationId] = clone(output); state.log.push({ actionId, options: { intent: raw.intent }, resourceCost, resourceAdjustment, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
     return { state, result: output, cached: false };
   }
   let attempt = null;
@@ -424,8 +449,13 @@ export function performCase04Action(original, actionId, raw = {}) {
   const output = publicResult(state, actionId, raw, attempt);
   progress(state, actionId); observeLaterWork(state, actionId);
   if (refunded) output.summary += ` Token 反芻胃返還 ${refunded} Token。`;
+  const resourceAdjustment = {
+    token: state.token - (resourcesBefore.token - resourceCost.token),
+    time: state.timeLeft - (resourcesBefore.time - resourceCost.time),
+    stress: state.stress - Math.min(CASE04_LIMITS.stressCap, resourcesBefore.stress + resourceCost.stress),
+  };
   state.stateVersion += 1; state.operationPayloads[raw.operationId] = payload; state.operationResults[raw.operationId] = clone(output);
-  state.log.push({ actionId, outcome: output.outcome, options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))), resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
+  state.log.push({ actionId, outcome: output.outcome, options: Object.fromEntries(Object.entries(raw).filter(([key]) => !['operationId', 'stateVersion'].includes(key))), resourceCost, resourceAdjustment, resources: { token: state.token, stress: state.stress, time: state.timeLeft } });
   return { state, result: output, cached: false };
 }
 

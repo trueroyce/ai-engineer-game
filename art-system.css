@@ -1,0 +1,787 @@
+:root {
+  --art-paper: #f4efe4;
+  --art-paper-deep: #e6decd;
+  --art-ink: #1f2430;
+  --art-pencil: #5e6370;
+  --art-blueprint: #2f5d8a;
+  --art-stamp: #b83a28;
+  --art-verify: #2f6b40;
+  --art-highlight: #f2d04b;
+  --art-case: #2a8487;
+  --art-case-soft: #d8efeb;
+  --art-edge: 2px solid var(--art-ink);
+  color-scheme: light;
+}
+
+.case-02-page { --art-case: #5f4b8b; --art-case-soft: #e7dff4; }
+.case-03-page { --art-case: #b4506a; --art-case-soft: #f4dce4; }
+.case-04-page { --art-case: #26335c; --art-case-soft: #dce2f1; }
+
+html { background: var(--art-paper-deep); }
+body {
+  position: relative;
+  color: var(--art-ink);
+  background-color: var(--art-paper);
+  background-image:
+    linear-gradient(rgba(31, 36, 48, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 36, 48, .025) 1px, transparent 1px);
+  background-size: 24px 24px;
+  font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  inset: 0 auto 0 14px;
+  width: 14px;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--art-paper-deep) 0 4px, var(--art-ink) 4.5px 6px, transparent 6.5px) 0 18px / 14px 58px repeat-y;
+  opacity: .48;
+}
+
+#app { position: relative; z-index: 1; }
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+code, .stat strong, .receipt strong, .project-number {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+button, a.button, .project-start {
+  border-radius: 5px 13px 5px 8px !important;
+  box-shadow: 3px 4px 0 rgba(31, 36, 48, .82);
+  transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+button:hover, a.button:hover, .project-start:hover {
+  transform: translate(-1px, -2px) rotate(-.25deg);
+  box-shadow: 5px 7px 0 rgba(31, 36, 48, .82);
+}
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--art-ink) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 8px var(--art-highlight) !important;
+}
+
+.eyebrow, .scene-chapter, .brand {
+  color: var(--art-case) !important;
+  letter-spacing: .04em !important;
+  text-transform: none !important;
+}
+
+/* Lobby: a shelf of case files, not a SaaS dashboard. */
+.career-page .mast {
+  position: relative;
+  overflow: hidden;
+  border: 3px solid var(--art-ink);
+  border-radius: 4px 22px 7px 13px;
+  background:
+    linear-gradient(90deg, var(--art-case) 0 13px, transparent 13px),
+    var(--white, #fffdf8);
+  box-shadow: 10px 12px 0 var(--art-case);
+}
+.career-page .mast::after {
+  content: "值班工單夾";
+  position: absolute;
+  right: -28px;
+  bottom: 20px;
+  padding: 7px 42px;
+  color: var(--art-case);
+  border: 3px double currentColor;
+  font-weight: 900;
+  transform: rotate(-7deg);
+  opacity: .18;
+}
+.career-page .choice-grid { gap: 18px; }
+.career-page .choice {
+  position: relative;
+  min-height: 250px;
+  overflow: hidden;
+  border: 2px solid var(--art-ink);
+  border-radius: 4px 16px 5px 9px;
+  background: #fffdf8;
+  box-shadow: 4px 5px 0 var(--art-paper-deep);
+}
+.career-page .choice.selected {
+  color: var(--art-ink);
+  background-color: #fffdf8;
+  border-color: var(--art-case);
+  box-shadow: 5px 6px 0 var(--art-case);
+}
+.career-page .choice .template-art,
+.career-page .choice .game-art {
+  display: block;
+  width: 100%;
+  height: 112px;
+  margin: -2px 0 4px;
+  background-color: var(--art-case-soft);
+  border-bottom: 2px solid var(--art-ink);
+}
+.career-page .choice.selected .template-art,
+.career-page .choice.selected .game-art { background-color: rgba(255,255,255,.88); }
+.career-page .projects { gap: 20px; }
+.career-page .project {
+  position: relative;
+  grid-template-columns: 74px minmax(0, 1fr) 230px;
+  overflow: hidden;
+  border: 3px solid var(--art-ink);
+  border-radius: 4px 18px 5px 10px;
+  box-shadow: 6px 7px 0 var(--art-paper-deep);
+}
+.career-page .project::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 9px;
+  background: var(--project-accent, var(--art-case));
+}
+.career-page .project:nth-child(1) { --project-accent: #2a8487; }
+.career-page .project:nth-child(2) { --project-accent: #5f4b8b; }
+.career-page .project:nth-child(3) { --project-accent: #b4506a; }
+.career-page .project:nth-child(4) { --project-accent: #26335c; }
+.career-page .project .case-file-art {
+  align-self: stretch;
+  width: 100%;
+  min-height: 126px;
+  color: var(--project-accent);
+  background-color: var(--art-paper);
+  border-left: 2px dashed var(--art-pencil);
+}
+.career-page .owned-card {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 132px;
+  overflow: hidden;
+  border-radius: 3px 12px 4px 7px !important;
+}
+.career-page .owned-card .game-art {
+  grid-row: 1 / span 2;
+  width: 70px;
+  height: 100%;
+  background-color: var(--art-paper-deep);
+  border-right: 2px solid var(--art-ink);
+}
+.career-page .owned-card.active::after {
+  content: "已裝備 ✓";
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  color: var(--art-verify);
+  font-size: .72rem;
+  font-weight: 900;
+  transform: rotate(-3deg);
+}
+
+/* Shared work-order panels and scene hierarchy. */
+.case-page .hero,
+.case-page .panel,
+.case-page .source-card,
+.case-page .action-card,
+.case-page .reward-card,
+.case-page .preview,
+.case-page .result,
+.case-page .ending-stage {
+  border-radius: 5px 16px 6px 10px;
+}
+.case-page .hero,
+.case-page .panel {
+  background-color: rgba(255, 253, 248, .97);
+}
+.case-page .hero { border-left: 10px solid var(--art-case); }
+.case-page .action-card {
+  position: relative;
+  border-width: 2px;
+  box-shadow: 4px 5px 0 rgba(31, 36, 48, .75);
+}
+.case-page .action-card::after {
+  content: "WORK ORDER";
+  position: absolute;
+  right: 9px;
+  top: 8px;
+  color: var(--art-case);
+  font: 800 .58rem/1 ui-monospace, monospace;
+  letter-spacing: .08em;
+  opacity: .55;
+}
+.case-04-page .action-choice-count {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 3px 7px;
+  color: var(--art-case);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .76rem;
+  font-weight: 800;
+}
+.case-04-page .route-preview {
+  margin: 16px 0;
+  padding: 12px;
+  color: var(--art-ink);
+  background: #fffdf8;
+  border: 2px solid var(--art-ink);
+  border-radius: 5px 14px 6px 9px;
+}
+.case-04-page .route-preview h2 { margin-bottom: 8px; font-size: 1rem; }
+.case-04-page .route-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.case-04-page .route-step {
+  min-height: 86px;
+  padding: 8px;
+  border: 1px dashed var(--art-pencil);
+  border-radius: 5px;
+}
+.case-04-page .route-step strong,
+.case-04-page .route-step small { display: block; }
+.case-04-page .route-step small { margin-top: 4px; color: var(--art-pencil); line-height: 1.35; }
+.case-04-page .route-step.done { background: #e4f4ea; border-style: solid; border-color: var(--art-verify); }
+.case-04-page .route-step.current { background: var(--art-highlight); border: 2px solid var(--art-ink); box-shadow: 2px 3px 0 var(--art-ink); }
+.case-04-page .route-step.locked {
+  opacity: 1;
+  background: #f3f1eb;
+  border-color: var(--art-pencil);
+  border-left-width: 4px;
+}
+.case-04-page .route-step.locked small { color: #3f4654; }
+.case-04-page .route-note { margin: 9px 0 0; font-size: .8rem; }
+.case-page .story-strip {
+  background: var(--art-highlight);
+  border-radius: 2px 9px 3px 6px;
+  box-shadow: 4px 5px 0 rgba(31,36,48,.7);
+  transform: rotate(-.35deg);
+}
+
+.narrative-stage {
+  position: relative;
+  grid-template-columns: minmax(250px, .78fr) minmax(0, 1.22fr);
+  padding: 24px 18px 18px;
+  border: 3px solid var(--art-ink);
+  border-radius: 3px 14px 4px 9px;
+  background:
+    linear-gradient(90deg, var(--art-case) 0 9px, transparent 9px),
+    var(--scene-surface);
+  box-shadow: 7px 8px 0 rgba(31, 36, 48, .82);
+}
+.narrative-stage::before {
+  content: "現場紀錄";
+  position: absolute;
+  top: -13px;
+  left: 19px;
+  padding: 3px 10px;
+  color: #fff;
+  background: var(--art-case);
+  border: 2px solid var(--art-ink);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  transform: rotate(-1deg);
+}
+.scene-cast-list { gap: 10px; }
+.scene-cast {
+  min-height: 132px;
+  padding: 7px 3px 9px;
+  border-radius: 3px 11px 4px 7px;
+  opacity: .72;
+}
+.scene-cast.active {
+  background: #fffdf8;
+  border: 3px solid var(--art-ink);
+  box-shadow: 3px 4px 0 var(--art-case);
+  transform: translateY(-3px) rotate(-.8deg);
+}
+.scene-cast strong { font-size: .84rem; }
+.scene-cast small { min-height: 2.4em; font-size: .7rem; line-height: 1.2; white-space: normal; }
+.scene-portrait {
+  width: 76px;
+  height: 76px;
+  overflow: visible;
+  fill: none;
+  stroke: none;
+}
+.scene-portrait .cast-outline,
+.scene-portrait .cast-line {
+  stroke: var(--art-ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.scene-portrait .cast-line { fill: none; stroke-width: 2.2; }
+.scene-portrait .cast-paper { fill: #fffdf8; }
+.scene-portrait .cast-face,
+.scene-portrait .cast-neck { fill: var(--cast-skin, #e8b58d); }
+.scene-portrait .cast-hair { fill: var(--art-ink); stroke: var(--art-ink); stroke-width: 2; }
+.scene-portrait .cast-accent { fill: var(--cast-accent, var(--art-case)); }
+.scene-portrait .cast-dot { fill: var(--art-ink); }
+.scene-portrait .cast-sweat { fill: #83b9d5; stroke: var(--art-ink); stroke-width: 1.5; }
+.scene-portrait .cast-beam { fill: rgba(242, 208, 75, .34); stroke: var(--art-ink); stroke-width: 2; }
+.scene-dialogue {
+  border-radius: 4px 13px 5px 8px;
+  box-shadow: inset 0 0 0 1px rgba(31, 36, 48, .08);
+}
+.scene-dialogue > p { font-size: 1.02rem; line-height: 1.75; }
+.scene-callback {
+  border-radius: 2px 8px 3px 5px;
+  transform: rotate(.25deg);
+}
+
+/* Result stamps make success, partial success and failure legible in shape and text. */
+.result { position: relative; overflow: visible; }
+.result::after {
+  position: absolute;
+  z-index: 4;
+  right: 18px;
+  top: 16px;
+  padding: 7px 12px 5px;
+  background: rgba(255,253,248,.92);
+  border: 5px double currentColor;
+  font-size: .92rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: .12em;
+  transform: rotate(5deg);
+  pointer-events: none;
+}
+.result-tone-good::after { content: "✓ 本步成功"; color: var(--art-verify); border-radius: 50%; }
+.result-tone-warn::after { content: "△ 部分成功"; color: var(--art-blueprint); }
+.result-tone-bad::after { content: "× 本步未成"; color: var(--art-stamp); transform: rotate(-7deg); }
+.result-tone-good, .result-tone-warn, .result-tone-bad {
+  border-color: var(--art-ink) !important;
+  box-shadow: 8px 9px 0 var(--art-case) !important;
+}
+
+/* Tool cards read as a family but keep 18 recognizable silhouettes. */
+.card-illustration {
+  background-color: var(--art-paper) !important;
+  background-image: linear-gradient(rgba(31,36,48,.04) 1px, transparent 1px);
+  background-size: 100% 18px;
+}
+.card-art-bg { fill: #fffdf8 !important; rx: 5px; }
+.card-illustration .halftone { fill: var(--art-case-soft); opacity: .7; }
+.card-illustration .category-shape { fill: #fffdf8; stroke: var(--art-ink); stroke-width: 3; }
+.card-illustration .category-understand .category-shape { fill: #d8efeb; }
+.card-illustration .category-build .category-shape { fill: #dce2f1; }
+.card-illustration .category-coordinate .category-shape { fill: #f4dce4; }
+.card-illustration .category-risk .category-shape { fill: #f7e4a2; }
+.card-illustration .card-index-mark { fill: none; stroke: var(--art-ink); stroke-width: 2; stroke-linecap: round; }
+.reward-card {
+  overflow: hidden;
+  border: 3px solid var(--art-ink) !important;
+  border-radius: 4px 13px 5px 8px !important;
+}
+.reward-card:nth-child(2) { transform: translateY(7px) rotate(.45deg); }
+.reward-card:nth-child(3) { transform: rotate(-.45deg); }
+
+/* Each ending is a signed handoff sheet, with case-specific scene lighting. */
+.ending-stage {
+  position: relative;
+  overflow: hidden;
+  border: 4px solid var(--art-ink);
+  box-shadow: 10px 12px 0 var(--art-case);
+}
+.ending-stage::before {
+  content: "交班副本";
+  position: absolute;
+  top: 14px;
+  right: -27px;
+  z-index: 2;
+  padding: 5px 34px;
+  color: var(--art-case);
+  background: rgba(255,253,248,.88);
+  border-block: 2px solid currentColor;
+  font-weight: 900;
+  transform: rotate(8deg);
+}
+.case-01-page .ending-stage { background: linear-gradient(145deg, #fffdf8 62%, #d8efeb); }
+.case-02-page .ending-stage { background: linear-gradient(145deg, #fffdf8 58%, #e7dff4); }
+.case-03-page .ending-stage { background: linear-gradient(145deg, #fffdf8 58%, #f4dce4); }
+.case-04-page .ending-stage { background: linear-gradient(155deg, #fffdf8 54%, #cbd5ef); }
+.ending-outcome-stamp { border-radius: 2px !important; color: var(--art-stamp); }
+
+@media (max-width: 800px) {
+  body::before { display: none; }
+  .career-page .project { grid-template-columns: 52px minmax(0, 1fr); }
+  .career-page .project .case-file-art { grid-column: 1 / -1; min-height: 112px; border: 0; border-top: 2px dashed var(--art-pencil); }
+  .narrative-stage { grid-template-columns: 1fr; padding: 22px 11px 12px; }
+  .scene-cast { min-height: 114px; }
+  .scene-portrait { width: 66px; height: 66px; }
+  .result::after { right: 9px; top: 9px; font-size: .72rem; }
+  .ending-stage::before { font-size: .72rem; }
+}
+
+@media (max-width: 420px) {
+  .career-page .choice { min-height: 226px; }
+  .career-page .owned-card { grid-template-columns: 58px minmax(0, 1fr); }
+  .career-page .owned-card .game-art { width: 58px; }
+  .scene-cast { min-height: 104px; }
+  .scene-portrait { width: 58px; height: 58px; }
+  .scene-cast strong { font-size: .76rem; }
+  .scene-cast small { font-size: .7rem; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .result::after { animation: art-stamp .22s cubic-bezier(.2,.9,.25,1.2) both; }
+  .scene-cast.active .cast-figure { animation: art-react .2s ease-out both; transform-origin: 44px 82px; }
+  .story-strip { animation: art-note .18s ease-out both; }
+  @keyframes art-stamp { from { opacity: 0; transform: scale(1.18) rotate(10deg); } }
+  @keyframes art-react { from { transform: translateY(4px) rotate(-2deg); } }
+  @keyframes art-note { from { opacity: 0; transform: translateY(-5px) rotate(-2deg); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  button:hover, a.button:hover, .project-start:hover { transform: none !important; }
+}
+
+@media (forced-colors: active) {
+  body { background: Canvas; color: CanvasText; }
+  .scene-portrait .cast-accent, .scene-portrait .cast-paper, .scene-portrait .cast-face { fill: Canvas; }
+  .scene-portrait .cast-outline, .scene-portrait .cast-line { stroke: CanvasText; }
+  .result::after, .narrative-stage::before { forced-color-adjust: none; }
+}
+
+/* Release art: generated portraits and scenes turn the work-order UI into a game stage. */
+.raster-template,
+.raster-case-file,
+.raster-card,
+.raster-case-scene,
+.raster-ending,
+.cast-sprite {
+  display: block;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+}
+
+.raster-template {
+  min-height: 142px;
+  background-image:
+    radial-gradient(circle at 50% 72%, rgba(255,255,255,.94), rgba(255,255,255,.15) 62%, transparent 63%),
+    var(--portrait-image);
+  background-size: 100% 100%, contain;
+  filter: drop-shadow(0 8px 8px rgba(31,36,48,.22));
+}
+
+.career-page .choice .raster-template {
+  height: 148px;
+  margin: -10px -12px 6px;
+  width: calc(100% + 24px);
+  border-bottom: 2px solid var(--art-ink);
+  background-color: var(--art-case-soft);
+}
+
+.raster-case-file {
+  background-image:
+    linear-gradient(90deg, rgba(31,36,48,.12), transparent 40%),
+    var(--scene-image);
+  background-size: cover;
+  background-position: center;
+}
+
+.raster-card {
+  position: relative;
+  min-height: 150px;
+  overflow: hidden;
+  background-color: #efe5d2 !important;
+  background-image: var(--card-image) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border-bottom: 2px solid var(--art-ink);
+  isolation: isolate;
+}
+.raster-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(150deg, transparent 55%, rgba(31,36,48,.12));
+}
+.raster-card .category-shape {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fffdf8;
+  background: var(--art-case);
+  box-shadow: 0 0 0 2px var(--art-ink);
+}
+.raster-card.category-understand .category-shape { border-radius: 50%; background: #2a8487; }
+.raster-card.category-build .category-shape { border-radius: 2px; background: #4776a7; }
+.raster-card.category-coordinate .category-shape { border-radius: 50% 2px; background: #b4506a; }
+.raster-card.category-risk .category-shape { transform: rotate(45deg); background: #d8a53b; }
+.fusion-star {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: var(--art-ink);
+  background: var(--art-highlight);
+  border: 2px solid var(--art-ink);
+  border-radius: 50%;
+  font-size: 1.05rem;
+  box-shadow: 2px 2px 0 rgba(31,36,48,.7);
+}
+
+.raster-case-scene {
+  position: relative;
+  min-height: 240px;
+  overflow: hidden;
+  background-image:
+    linear-gradient(90deg, rgba(16,23,38,.03), rgba(16,23,38,.48)),
+    url('./assets/art/backgrounds/case01-meeting-room.png');
+  background-size: cover;
+  background-position: center;
+  border: 3px solid var(--art-ink);
+  border-radius: 5px 20px 6px 10px;
+  box-shadow: 7px 8px 0 rgba(31,36,48,.68);
+}
+.raster-case-scene .raster-template {
+  position: absolute;
+  right: -2%;
+  bottom: -10%;
+  width: 52%;
+  height: 110%;
+  min-height: 0;
+  border: 0;
+  background-color: transparent;
+  background-image: var(--portrait-image);
+  background-size: contain;
+}
+
+.narrative-stage {
+  --stage-image: url('./assets/art/backgrounds/case01-meeting-room.png');
+  grid-template-columns: minmax(390px, 1.24fr) minmax(310px, .76fr);
+  align-items: end;
+  min-height: 470px;
+  overflow: hidden;
+  background-color: #1b2433;
+  background-image:
+    linear-gradient(90deg, rgba(16,23,38,.08) 0 46%, rgba(16,23,38,.78) 75% 100%),
+    linear-gradient(0deg, rgba(16,23,38,.55), transparent 55%),
+    var(--stage-image);
+  background-size: cover;
+  background-position: center;
+  isolation: isolate;
+}
+.case-02-page .narrative-stage { --stage-image: url('./assets/art/backgrounds/case02-data-room.png'); }
+.case-03-page .narrative-stage { --stage-image: url('./assets/art/backgrounds/case03-client-room.png'); }
+.case-04-page .narrative-stage { --stage-image: url('./assets/art/backgrounds/case04-server-warroom.png'); }
+.narrative-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 -110px 95px rgba(8,13,25,.55), inset 0 0 0 1px rgba(255,255,255,.1);
+}
+.scene-cast-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  align-self: stretch;
+  gap: 0;
+  min-width: 0;
+}
+.scene-cast {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-self: end;
+  min-width: 0;
+  min-height: 360px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  filter: saturate(.65) brightness(.78);
+  opacity: .72;
+  transition: transform .18s ease, filter .18s ease, opacity .18s ease;
+}
+.scene-cast.active {
+  z-index: 2;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  filter: none;
+  opacity: 1;
+  transform: scale(1.08) translateY(-4px);
+}
+.scene-portrait.cast-sprite {
+  width: 100%;
+  height: 318px;
+  overflow: visible;
+  background-image: var(--portrait-image);
+  background-size: contain;
+  filter: drop-shadow(0 11px 8px rgba(5,9,18,.42));
+}
+.scene-cast > span:last-child {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  min-height: 52px;
+  align-content: center;
+  margin: -24px 4px 0;
+  padding: 7px 9px;
+  color: var(--art-ink);
+  background: rgba(255,253,248,.9);
+  border: 2px solid var(--art-ink);
+  border-radius: 4px 10px 4px 7px;
+  box-shadow: 3px 4px 0 rgba(31,36,48,.72);
+  text-align: center;
+}
+.scene-cast.active > span:last-child { background: var(--art-highlight); }
+.scene-dialogue {
+  position: relative;
+  z-index: 4;
+  align-self: end;
+  margin: 0 0 7px;
+  padding: clamp(18px, 3vw, 30px);
+  color: var(--art-ink);
+  background: rgba(255,253,248,.94);
+  border: 3px solid var(--art-ink);
+  box-shadow: 8px 9px 0 rgba(8,13,25,.68);
+  backdrop-filter: blur(8px);
+}
+.scene-dialogue h2 { margin-block: .35rem .65rem; font-size: clamp(1.35rem, 2.5vw, 2rem); }
+.scene-dialogue > p { margin: 0; font-size: 1.05rem; line-height: 1.8; }
+.scene-callback { margin-top: 1rem !important; }
+
+.ending-stage,
+.ending-tableau {
+  background-color: #182235 !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+.case-01-page .ending-tableau { background-image: linear-gradient(rgba(12,20,34,.1), rgba(12,20,34,.55)), url('./assets/art/backgrounds/case01-meeting-room.png'); }
+.case-02-page .ending-stage { background-image: linear-gradient(90deg, rgba(10,18,32,.2), rgba(10,18,32,.82)), url('./assets/art/backgrounds/case02-data-room.png'); }
+.case-03-page .ending-stage { background-image: linear-gradient(90deg, rgba(10,18,32,.16), rgba(10,18,32,.8)), url('./assets/art/backgrounds/case03-client-room.png'); }
+.case-04-page .ending-stage { background-image: linear-gradient(90deg, rgba(10,18,32,.12), rgba(10,18,32,.82)), url('./assets/art/backgrounds/case04-server-warroom.png'); }
+.raster-ending {
+  position: relative;
+  min-height: 280px;
+  background-image: linear-gradient(rgba(12,20,34,.04), rgba(12,20,34,.54)), url('./assets/art/backgrounds/case01-meeting-room.png');
+  background-size: cover;
+  background-position: center;
+}
+.raster-ending > .raster-template,
+.raster-case-ending > .raster-template,
+.raster-case04-art > .raster-template {
+  position: absolute;
+  z-index: 1;
+  right: 3%;
+  bottom: -11%;
+  width: min(56%, 360px);
+  height: 112%;
+  min-height: 0;
+  background-color: transparent;
+  background-image: var(--portrait-image);
+  background-size: contain;
+  filter: drop-shadow(0 12px 10px rgba(5,9,18,.46));
+}
+.raster-ending > .ending-emblem,
+.raster-case-ending > .ending-emblem,
+.raster-case04-art > .ending-emblem {
+  z-index: 2;
+  left: 28%;
+}
+.ending-emblem {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  color: #fffdf8;
+  background: rgba(31,36,48,.74);
+  border: 7px double currentColor;
+  border-radius: 50%;
+  font: 900 3.4rem/1 system-ui, sans-serif;
+  transform: translate(-50%, -50%) rotate(-7deg);
+  text-shadow: 2px 3px 0 var(--art-ink);
+}
+.raster-ending.ending-formal .ending-emblem { color: #9de0ae; }
+.raster-ending.ending-limited .ending-emblem { color: #9fc5f1; }
+.raster-ending.ending-showcase .ending-emblem { color: var(--art-highlight); }
+.raster-ending.ending-stop .ending-emblem { color: #ef8d7f; }
+
+.raster-case-ending,
+.raster-case04-art {
+  position: relative;
+  display: block;
+  min-height: 300px;
+  overflow: hidden;
+  background-color: #172238;
+  background-image:
+    linear-gradient(135deg, rgba(10,18,32,.06), rgba(10,18,32,.68)),
+    var(--ending-image, url('./assets/art/backgrounds/case04-server-warroom.png'));
+  background-size: cover;
+  background-position: center;
+  border: 3px solid var(--art-ink);
+  border-radius: 6px 24px 8px 12px;
+  box-shadow: 7px 8px 0 rgba(31,36,48,.68);
+}
+.raster-case-ending.good .ending-emblem,
+.raster-case04-art.good .ending-emblem { color: #9de0ae; }
+.raster-case-ending.warn .ending-emblem { color: var(--art-highlight); }
+.raster-case-ending.bad .ending-emblem,
+.raster-case04-art.bad .ending-emblem { color: #ef8d7f; }
+.case-04-page .raster-case04-art {
+  --ending-image: url('./assets/art/backgrounds/case04-server-warroom.png');
+}
+.case-04-page .layout .raster-case04-art,
+.case-04-page .preview > .raster-case04-art,
+.case-04-page .result > .raster-case04-art {
+  display: none;
+}
+.case04-stage .scene-cast.active { background: transparent; }
+
+@media (max-width: 800px) {
+  .narrative-stage {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding-top: 32px;
+    background-image:
+      linear-gradient(0deg, rgba(9,15,28,.8) 0 43%, rgba(9,15,28,.06) 70%),
+      var(--stage-image);
+    background-position: center;
+  }
+  .scene-cast-list { min-height: 238px; }
+  .scene-cast { min-height: 235px; }
+  .scene-portrait.cast-sprite { height: 206px; }
+  .scene-cast > span:last-child { min-height: 45px; margin-top: -20px; padding: 5px 4px; }
+  .scene-dialogue { margin: 8px 0 0; padding: 17px 15px; }
+  .raster-case-scene { min-height: 205px; }
+  .raster-card { min-height: 126px; }
+  .raster-case-ending, .raster-case04-art { min-height: 220px; }
+  .case-04-page .route-steps { grid-template-columns: 1fr; }
+  .case-04-page .route-step { min-height: 0; }
+}
+
+@media (max-width: 420px) {
+  .career-page .choice .raster-template { height: 118px; }
+  .scene-cast-list { min-height: 196px; }
+  .scene-cast { min-height: 194px; }
+  .scene-portrait.cast-sprite { width: 100%; height: 170px; }
+  .scene-cast > span:last-child { min-height: 42px; margin-inline: 1px; }
+  .scene-dialogue > p { font-size: .98rem; line-height: 1.7; }
+  .raster-card { min-height: 112px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scene-cast.active .cast-sprite { animation: portrait-arrive .24s ease-out both; }
+  @keyframes portrait-arrive { from { opacity: .5; transform: translateY(12px); } }
+}
+
+@media (forced-colors: active) {
+  .raster-template, .raster-case-file, .raster-card, .raster-case-scene, .raster-ending,
+  .narrative-stage, .ending-stage, .ending-tableau, .raster-case-ending, .raster-case04-art,
+  .case-04-page .ending .hero { background-image: none !important; }
+  .scene-cast > span:last-child, .scene-dialogue { color: CanvasText; background: Canvas; border-color: CanvasText; }
+}

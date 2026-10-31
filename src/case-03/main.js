@@ -1,6 +1,7 @@
 import { loadCareer, reserveRun, saveActiveRun, saveCareer, settleCase } from '../career/state-v2.js';
 import { buildCareerCaseRunRecord } from '../postgame/career-run-export.js';
 import { createCoachSession } from '../postgame/coach-ui.js';
+import { captureActiveControl, focusChangedScreen } from '../presentation/screen-transition.js';
 import { chooseCase03Reward, createCase03Game, performCase03Action } from './engine.js';
 import { renderCase03Board, renderCase03Ending, renderCase03Error, renderCase03Intro, renderCase03Preview, renderCase03Result, renderCase03Reward } from './render-v2.js';
 
@@ -29,6 +30,7 @@ if (career?.activeRun?.caseId === 'case-03') {
   screen = 'error';
   load.reason = `已有 ${career.activeRun.caseId} 進行中的案件；請先回到該案件。`;
 }
+let renderedScreen = screen;
 
 function persistActive() {
   if (!state?.runId || state.phase === 'ended') return;
@@ -36,6 +38,8 @@ function persistActive() {
 }
 
 function render() {
+  const screenChanged = screen !== renderedScreen;
+  const restoreControl = captureActiveControl(root, screenChanged);
   if (screen === 'error') root.innerHTML = renderCase03Error(load.reason ?? '職涯存檔不可用');
   else if (screen === 'intro') root.innerHTML = renderCase03Intro(career);
   else if (screen === 'preview') root.innerHTML = renderCase03Preview(state, actionId, options);
@@ -45,7 +49,9 @@ function render() {
     if (!settlement) { settlement = settleCase(career, state); career = saveCareer(settlement.career); }
     root.innerHTML = renderCase03Ending(state, settlement, coach.view);
   } else root.innerHTML = renderCase03Board(state, message);
-  root.querySelector('[tabindex="-1"]')?.focus({ preventScroll: true });
+  focusChangedScreen(root, screenChanged);
+  if (!screenChanged) restoreControl?.();
+  renderedScreen = screen;
 }
 
 root.addEventListener('click', async (event) => {

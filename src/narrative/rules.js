@@ -86,6 +86,16 @@ export const LIMITS = Object.freeze({
   highStress: 8,
 });
 
+export function case01StartingResources(templateId) {
+  return Object.freeze({
+    token: LIMITS.token + (templateId === 'beginner' ? 4 : 0),
+    stress: 0,
+    time: LIMITS.deadline + (templateId === 'beginner' ? 2 : 0),
+    overtime: 0,
+    workCount: 0,
+  });
+}
+
 export function assertAttributes(attrs) {
   if (!attrs || !['A', 'E', 'V'].every((key) => Number.isInteger(attrs[key]) && attrs[key] >= 1 && attrs[key] <= 10)) {
     throw new Error('A/E/V 必須各為 1–10');

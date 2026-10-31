@@ -3,6 +3,11 @@ import { applyRequirementRevision, createAttemptState, payRetry, previewAttempt,
 
 const clone = (value) => structuredClone(value);
 
+export const CAREER_TEMPLATE_ATTEMPT_MODIFIERS = Object.freeze({
+  beginner: Object.freeze({ id: 'beginner-guidance', label: '教學引導：按流程拆解問題', value: 30 }),
+  ultimate: Object.freeze({ id: 'ultimate-focus', label: '全能戰士：跨域熟練', value: 5 }),
+});
+
 export function initializeCaseAttempts(state) {
   state.attempts ??= createAttemptState();
   state.attemptHistory ??= {};
@@ -11,6 +16,7 @@ export function initializeCaseAttempts(state) {
 }
 
 function requestFor(state, config, operationId = 'preview') {
+  const templateModifier = state.progression ? CAREER_TEMPLATE_ATTEMPT_MODIFIERS[state.templateId] : null;
   return {
     operationId,
     semanticKey: config.semanticKey,
@@ -23,6 +29,7 @@ function requestFor(state, config, operationId = 'preview') {
     equipped: state.equipped,
     modifiers: [
       { id: `ability-${config.ability}`, label: `${config.ability} 能力`, value: state.abilities[config.ability] * 5 },
+      ...(templateModifier ? [templateModifier] : []),
       ...(config.modifiers ?? []),
     ],
     events: config.events,

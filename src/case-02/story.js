@@ -227,10 +227,11 @@ function routeResult(title, summary, player, response, consequence) {
 export function observeCase02Story(state, actionId, options, result) {
   state.story = normalizeCase02Story(state.story);
   const story = state.story;
+  const attemptCompleted = !state.lastAttempt || state.lastAttempt.outcome !== 'failure';
   if (actionId === 'B02' && options.strategy === 'two') story.commitments.parallelSchemaDrift = 'pending';
   if (actionId === 'B04' && options.response === 'patch') story.commitments.verbalChange = 'pending';
   if (actionId === 'B05' && options.mode === 'delete') story.commitments.deletedRows = 'pending';
-  if (actionId === 'B05' && options.mode === 'repair') {
+  if (actionId === 'B05' && options.mode === 'repair' && attemptCompleted) {
     for (const key of ['parallelSchemaDrift', 'forcedPatch']) story.commitments[key] = 'resolved';
   }
 
@@ -241,7 +242,7 @@ export function observeCase02Story(state, actionId, options, result) {
     if (result.process) result.process.consequence += ' 延後後果：早先兩個平行 agent 的欄位命名分岔，現在新增 1 點整合債。';
   }
 
-  if (actionId === 'B06') {
+  if (actionId === 'B06' && attemptCompleted) {
     const full = options.scope === 'full';
     const findings = [];
     if (story.commitments.deletedRows === 'pending') { story.commitments.deletedRows = 'surfaced'; findings.push('客戶抽查發現被刪除的來源列'); }
@@ -262,7 +263,7 @@ export function observeCase02Story(state, actionId, options, result) {
       addConsequence(story, 'deleted-row-audit', '來源追溯發現先前刪除的列無法還原。');
       if (result.process) result.process.consequence += ' 延後後果：來源追溯找不到先前被刪除的列，追溯仍未完成。';
     }
-    if (story.commitments.extraSource === 'pending') story.commitments.extraSource = 'resolved';
+    if (story.commitments.extraSource === 'pending' && attemptCompleted) story.commitments.extraSource = 'resolved';
   }
 
   const attempt = state.lastAttempt;
